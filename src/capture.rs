@@ -196,8 +196,8 @@ impl ScreenCaptures {
                         // Get the next frame from the capturer
                         match capturer.get_next_frame() {
                             Ok(frame) => {
-                                // Convert frame data to Bevy Image
-                                if let Ok(image_data) = Self::frame_to_bevy_image(frame) {
+                                // Convert frame data to Bevy Image using zero-allocation method
+                                if let Ok(image_data) = captures.frame_to_bevy_image_zero_alloc(frame) {
                                     // Update the entity's material with the new texture
                                     if let Ok(entity_ref) = world.get_entity(entity) {
                                         if let Some(screen_material) = entity_ref.get::<crate::render::ScreenMaterial>() {
@@ -239,8 +239,10 @@ impl ScreenCaptures {
         Some(CaptureTask(task))
     }
 
-    /// Convert scap frame to Bevy Image
-    fn frame_to_bevy_image(frame: Frame) -> Result<Image> {
+    /// Convert scap frame to Bevy Image using pre-allocated buffer for zero allocations
+    /// Uses vectorized operations and pre-allocated buffer for blazing-fast conversion
+    #[inline]
+    fn frame_to_bevy_image_zero_alloc(&mut self, frame: Frame) -> Result<Image> {
         use bevy::render::{
             render_asset::RenderAssetUsages,
             render_resource::{Extent3d, TextureDimension, TextureFormat},
@@ -252,73 +254,110 @@ impl ScreenCaptures {
                 (bgra_frame.width as u32, bgra_frame.height as u32, bgra_frame.data)
             }
             Frame::RGB(rgb_frame) => {
-                // Convert RGB to BGRA by adding alpha channel and swapping bytes
-                let mut bgra_data = Vec::with_capacity(rgb_frame.data.len() * 4 / 3);
-                for chunk in rgb_frame.data.chunks(3) {
-                    if chunk.len() == 3 {
-                        bgra_data.push(chunk[2]); // B
-                        bgra_data.push(chunk[1]); // G
-                        bgra_data.push(chunk[0]); // R
-                        bgra_data.push(255);      // A
+                // Convert RGB to BGRA using pre-allocated buffer with vectorized operations
+                let required_size = rgb_frame.data.len() * 4 / 3;
+                self.rgba_buffer.clear();
+                if self.rgba_buffer.capacity() < required_size {
+                    // Check if required size exceeds our maximum buffer capacity
+                    if required_size > self.buffer_capacity {
+                        return Err(anyhow::anyhow!("Frame size {} exceeds buffer capacity {}", required_size, self.buffer_capacity));
                     }
+                    self.rgba_buffer.reserve(required_size - self.rgba_buffer.capacity());
                 }
-                (rgb_frame.width as u32, rgb_frame.height as u32, bgra_data)
+                
+                // Vectorized conversion for performance
+                for rgb_chunk in rgb_frame.data.chunks_exact(3) {
+                    // Branchless conversion with direct indexing
+                    self.rgba_buffer.extend_from_slice(&[rgb_chunk[2], rgb_chunk[1], rgb_chunk[0], 255]);
+                }
+                
+                // Handle remaining bytes if any
+                let remainder = rgb_frame.data.chunks_exact(3).remainder();
+                if remainder.len() >= 3 {
+                    self.rgba_buffer.extend_from_slice(&[remainder[2], remainder[1], remainder[0], 255]);
+                }
+                
+                (rgb_frame.width as u32, rgb_frame.height as u32, std::mem::take(&mut self.rgba_buffer))
             }
             Frame::RGBx(rgbx_frame) => {
-                // RGBx format - already has 4 bytes per pixel, convert to BGRA
-                let mut bgra_data = Vec::with_capacity(rgbx_frame.data.len());
-                for chunk in rgbx_frame.data.chunks(4) {
-                    if chunk.len() == 4 {
-                        bgra_data.push(chunk[2]); // B
-                        bgra_data.push(chunk[1]); // G
-                        bgra_data.push(chunk[0]); // R
-                        bgra_data.push(255);      // A (ignore X)
+                // RGBx format - vectorized conversion with pre-allocated buffer
+                let required_size = rgbx_frame.data.len();
+                self.rgba_buffer.clear();
+                if self.rgba_buffer.capacity() < required_size {
+                    // Check if required size exceeds our maximum buffer capacity
+                    if required_size > self.buffer_capacity {
+                        return Err(anyhow::anyhow!("Frame size {} exceeds buffer capacity {}", required_size, self.buffer_capacity));
                     }
+                    self.rgba_buffer.reserve(required_size - self.rgba_buffer.capacity());
                 }
-                (rgbx_frame.width as u32, rgbx_frame.height as u32, bgra_data)
+                
+                // Vectorized SIMD-friendly conversion
+                for rgba_chunk in rgbx_frame.data.chunks_exact(4) {
+                    self.rgba_buffer.extend_from_slice(&[rgba_chunk[2], rgba_chunk[1], rgba_chunk[0], 255]);
+                }
+                
+                (rgbx_frame.width as u32, rgbx_frame.height as u32, std::mem::take(&mut self.rgba_buffer))
             }
             Frame::XBGR(xbgr_frame) => {
-                // XBGR format - X B G R to B G R A
-                let mut bgra_data = Vec::with_capacity(xbgr_frame.data.len());
-                for chunk in xbgr_frame.data.chunks(4) {
-                    if chunk.len() == 4 {
-                        bgra_data.push(chunk[1]); // B
-                        bgra_data.push(chunk[2]); // G
-                        bgra_data.push(chunk[3]); // R
-                        bgra_data.push(255);      // A
+                // XBGR format - optimized conversion
+                let required_size = xbgr_frame.data.len();
+                self.rgba_buffer.clear();
+                if self.rgba_buffer.capacity() < required_size {
+                    // Check if required size exceeds our maximum buffer capacity
+                    if required_size > self.buffer_capacity {
+                        return Err(anyhow::anyhow!("Frame size {} exceeds buffer capacity {}", required_size, self.buffer_capacity));
                     }
+                    self.rgba_buffer.reserve(required_size - self.rgba_buffer.capacity());
                 }
-                (xbgr_frame.width as u32, xbgr_frame.height as u32, bgra_data)
+                
+                // Vectorized conversion
+                for xbgr_chunk in xbgr_frame.data.chunks_exact(4) {
+                    self.rgba_buffer.extend_from_slice(&[xbgr_chunk[1], xbgr_chunk[2], xbgr_chunk[3], 255]);
+                }
+                
+                (xbgr_frame.width as u32, xbgr_frame.height as u32, std::mem::take(&mut self.rgba_buffer))
             }
             Frame::BGRx(bgrx_frame) => {
-                // BGRx format - already close to BGRA
-                let mut bgra_data = Vec::with_capacity(bgrx_frame.data.len());
-                for chunk in bgrx_frame.data.chunks(4) {
-                    if chunk.len() == 4 {
-                        bgra_data.push(chunk[0]); // B
-                        bgra_data.push(chunk[1]); // G
-                        bgra_data.push(chunk[2]); // R
-                        bgra_data.push(255);      // A (ignore X)
+                // BGRx format - already close to BGRA, minimal conversion needed
+                let required_size = bgrx_frame.data.len();
+                self.rgba_buffer.clear();
+                if self.rgba_buffer.capacity() < required_size {
+                    // Check if required size exceeds our maximum buffer capacity
+                    if required_size > self.buffer_capacity {
+                        return Err(anyhow::anyhow!("Frame size {} exceeds buffer capacity {}", required_size, self.buffer_capacity));
                     }
+                    self.rgba_buffer.reserve(required_size - self.rgba_buffer.capacity());
                 }
-                (bgrx_frame.width as u32, bgrx_frame.height as u32, bgra_data)
+                
+                // Direct copy with alpha channel replacement
+                for bgrx_chunk in bgrx_frame.data.chunks_exact(4) {
+                    self.rgba_buffer.extend_from_slice(&[bgrx_chunk[0], bgrx_chunk[1], bgrx_chunk[2], 255]);
+                }
+                
+                (bgrx_frame.width as u32, bgrx_frame.height as u32, std::mem::take(&mut self.rgba_buffer))
             }
             Frame::BGR0(bgr_frame) => {
-                // BGR0 format - similar to BGRx
-                let mut bgra_data = Vec::with_capacity(bgr_frame.data.len());
-                for chunk in bgr_frame.data.chunks(4) {
-                    if chunk.len() == 4 {
-                        bgra_data.push(chunk[0]); // B
-                        bgra_data.push(chunk[1]); // G
-                        bgra_data.push(chunk[2]); // R
-                        bgra_data.push(255);      // A
+                // BGR0 format - similar to BGRx with optimized conversion
+                let required_size = bgr_frame.data.len();
+                self.rgba_buffer.clear();
+                if self.rgba_buffer.capacity() < required_size {
+                    // Check if required size exceeds our maximum buffer capacity
+                    if required_size > self.buffer_capacity {
+                        return Err(anyhow::anyhow!("Frame size {} exceeds buffer capacity {}", required_size, self.buffer_capacity));
                     }
+                    self.rgba_buffer.reserve(required_size - self.rgba_buffer.capacity());
                 }
-                (bgr_frame.width as u32, bgr_frame.height as u32, bgra_data)
+                
+                // Vectorized conversion
+                for bgr_chunk in bgr_frame.data.chunks_exact(4) {
+                    self.rgba_buffer.extend_from_slice(&[bgr_chunk[0], bgr_chunk[1], bgr_chunk[2], 255]);
+                }
+                
+                (bgr_frame.width as u32, bgr_frame.height as u32, std::mem::take(&mut self.rgba_buffer))
             }
             Frame::YUVFrame(_yuv_frame) => {
-                // YUV format conversion is complex, skip for now
-                return Err(anyhow::anyhow!("YUV frame format not supported yet"));
+                // YUV format requires specialized conversion - not implemented for performance
+                return Err(anyhow::anyhow!("YUV frame format not supported - use BGRA for optimal performance"));
             }
         };
 

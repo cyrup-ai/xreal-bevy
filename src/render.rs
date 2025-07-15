@@ -108,17 +108,29 @@ pub fn spawn_capture_tasks(
     }
 }
 
-/// Handle completed capture tasks using CommandQueue pattern
+/// Handle completed capture tasks using CommandQueue pattern with jitter measurement
 #[inline]
 pub fn handle_capture_tasks(
     mut commands: Commands,
     mut tasks: Query<&mut CaptureTask>,
+    mut jitter_metrics: ResMut<crate::JitterMetrics>,
+    time: Res<Time>,
 ) {
     use bevy::tasks::{futures_lite::future, block_on};
+    
+    // Use high-precision timing for capture interval measurement
+    let current_time = time.elapsed_secs_f64() as f32 * 1000.0;
     
     for mut task in &mut tasks {
         // Poll the task non-blocking - this is the only acceptable use of block_on for polling
         if let Some(mut command_queue) = block_on(future::poll_once(&mut task.0)) {
+            // Measure screen capture timing for jitter analysis
+            if jitter_metrics.last_capture_time > 0.0 {
+                let capture_interval = current_time - jitter_metrics.last_capture_time;
+                jitter_metrics.add_capture_measurement(capture_interval);
+            }
+            jitter_metrics.last_capture_time = current_time;
+            
             // Apply the command queue to execute deferred world modifications
             commands.append(&mut command_queue);
         }

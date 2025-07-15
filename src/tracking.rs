@@ -30,7 +30,6 @@ pub enum Command {
     SetRollLock(bool),
     StartCalibration,
     SetBrightness(u8),
-    SetDisplayMode(bool),
 }
 
 #[derive(Copy, Clone)]
@@ -61,6 +60,16 @@ pub async fn poll_imu_bevy(rx_command: Receiver<Command>, tx_data: Sender<Data>)
         let mut cal_state = CalibrationState::default();
         
         loop {
+            // Extract bias values from calibration state if available
+            match &cal_state {
+                CalibrationState::Calibrated { gyro_bias: gb, accel_bias: ab, mag_bias: mb } => {
+                    gyro_bias = *gb;
+                    accel_bias = *ab;
+                    mag_bias = *mb;
+                }
+                _ => {}
+            }
+            
             // Check for commands from the main thread
             if let Ok(cmd) = rx_command.try_recv() {
                 match cmd {
@@ -75,7 +84,6 @@ pub async fn poll_imu_bevy(rx_command: Receiver<Command>, tx_data: Sender<Data>)
                         mag_samples: [[0.0; 3]; 5000] 
                     },
                     Command::SetBrightness(b) => { let _ = glasses.set_brightness(b); }
-                    Command::SetDisplayMode(m) => { let _ = glasses.set_display_mode(m); }
                 }
             }
 
