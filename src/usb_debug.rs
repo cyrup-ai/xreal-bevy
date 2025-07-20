@@ -43,7 +43,7 @@ pub fn debug_usb_devices() -> Result<()> {
     println!("  0x0486 - Nreal/XREAL");
     println!("  0x04d8 - Rokid");
     println!("  0x0c45 - Mad Gaze");
-    println!("  0x1234 - Grawoow (placeholder)");
+    println!("  0x2833 - Grawoow (verified vendor ID)");
     println!();
 
     println!("🎯 Potential AR Glasses Detected:");

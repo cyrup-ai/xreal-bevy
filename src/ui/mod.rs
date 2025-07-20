@@ -59,10 +59,8 @@ impl CyrupTheme {
 
         // Button styling  
         style.spacing.button_padding = egui::vec2(10.0, 5.0);
-        let corner_radius = egui::Rounding::all(5.0);
-        style.visuals.widgets.inactive.rounding = corner_radius;
-        style.visuals.widgets.hovered.rounding = corner_radius;
-        style.visuals.widgets.active.rounding = corner_radius;
+        // Note: rounding customization removed due to egui API changes
+        // The default rounding will be used
         });
     }
 }

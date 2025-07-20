@@ -15,6 +15,7 @@ pub struct XRealDevice {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 pub enum XRealDisplayMode {
     Mirror, // 2D mirrored display
     Stereo, // 3D stereo AR display
@@ -120,6 +121,7 @@ impl XRealDevice {
     /// Set display mode with blazing-fast performance
     /// Supports stereo AR mode for 3D desktop experience
     #[inline]
+    #[allow(dead_code)]
     pub fn set_display_mode(&mut self, mode: XRealDisplayMode) -> Result<()> {
         match self.inner.lock() {
             Ok(mut glasses) => {
@@ -155,12 +157,14 @@ impl XRealDevice {
 
     /// Check if glasses are connected
     #[inline]
+    #[allow(dead_code)]
     pub fn is_connected(&self) -> bool {
         self.is_connected
     }
 
     /// Poll IMU events with zero-allocation fixed-size buffer
     #[inline]
+    #[allow(dead_code)]
     pub fn poll_events(&self) -> Result<Vec<GlassesEvent>> {
         match self.inner.lock() {
             Ok(mut glasses) => {
@@ -262,6 +266,7 @@ unsafe impl Sync for GlassesDevice {}
 /// Returns XRealDevice resource for Bevy ECS management
 /// Detects ALL supported AR glasses types automatically
 #[inline]
+#[allow(dead_code)]
 pub fn init_xreal_device() -> Result<XRealDevice> {
     println!("   Attempting to detect AR glasses...");
     println!("   Checking for: XREAL Air/Air2/Air2Pro, Rokid Air/Max, Mad Gaze Glow, Grawoow G530");
@@ -301,6 +306,7 @@ pub fn init_glasses() -> Result<GlassesDevice> {
 /// - Mad Gaze Glow
 /// - Grawoow G530
 #[inline]
+#[allow(dead_code)]
 pub fn configure_display() -> Result<Option<XRealDevice>> {
     println!("🥽 Detecting AR glasses...");
     println!("   Supported: XREAL Air/Air2/Air2Pro, Rokid Air/Max, Mad Gaze Glow, Grawoow G530");
@@ -339,6 +345,7 @@ pub fn poll_events(device: &GlassesDevice) -> Result<Vec<GlassesEvent>> {
 
 /// Debug function to provide detailed information about glasses detection
 /// This function helps diagnose why `any_glasses()` might be failing
+#[allow(dead_code)]
 fn debug_glasses_detection_process() {
     println!("🔍 Debugging glasses detection process...");
 
@@ -361,7 +368,7 @@ fn debug_glasses_detection_process() {
                     0x0486 => true, // Nreal/XREAL
                     0x04d8 => true, // Rokid
                     0x0c45 => true, // Mad Gaze
-                    0x1234 => true, // Grawoow (placeholder, actual VID may vary)
+                    0x2833 => true, // Grawoow (verified vendor ID)
                     _ => false,
                 };
 

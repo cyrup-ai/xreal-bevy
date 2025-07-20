@@ -1,0 +1,64 @@
+# Nextest configuration for XREAL Bevy project
+# High-performance test runner optimized for Rust projects
+#
+# This configuration enables parallel test execution with proper isolation
+# and enhanced reporting for the production-ready XREAL codebase.
+
+[profile.default]
+# Default test execution timeout (important for integration tests)
+slow-timeout = { period = "60s", terminate-after = 2 }
+leak-timeout = "100ms"
+
+# Retry configuration for flaky tests
+retries = 1
+
+# Test execution strategy
+test-threads = "num-cpus"
+failure-output = "immediate"
+success-output = "never"
+status-level = "pass"
+
+# Test filtering and selection
+filter-expr = ""
+
+[profile.ci]
+# CI-specific configuration with stricter timeouts
+slow-timeout = { period = "30s", terminate-after = 1 }
+leak-timeout = "50ms"
+retries = 2
+failure-output = "immediate-final"
+success-output = "never"
+
+[profile.quick]
+# Quick testing profile for development
+slow-timeout = { period = "10s", terminate-after = 1 }
+retries = 0
+test-threads = "num-cpus"
+
+[test-groups]
+# Group integration tests separately from unit tests
+integration = { max-threads = 1 }
+serial = { max-threads = 1 }
+
+[[profile.default.overrides]]
+# Storage tests need more time for file I/O operations
+filter = 'test(/storage/)'
+slow-timeout = { period = "30s", terminate-after = 2 }
+
+[[profile.default.overrides]]
+# Serialization tests with compression may take longer
+filter = 'test(/serialization/)'
+slow-timeout = { period = "20s", terminate-after = 2 }
+
+[[profile.default.overrides]]
+# Plugin tests that involve WGPU/graphics may need extra time
+filter = 'test(/plugins/)'
+slow-timeout = { period = "25s", terminate-after = 2 }
+
+[profile.default.junit]
+# JUnit XML output for CI integration
+path = "target/nextest/junit.xml"
+
+[profile.default.experimental]
+# Enable experimental features for better performance
+setup-scripts = []

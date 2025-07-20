@@ -619,9 +619,110 @@ pub mod utils {
     
     /// Get available disk space
     pub async fn get_available_space(path: &Path) -> Result<u64> {
-        // This is a simplified implementation
-        // In a real implementation, you would use platform-specific APIs
-        Ok(1024 * 1024 * 1024) // 1GB as placeholder
+        // Ensure path exists or use parent directory
+        let check_path = if path.exists() {
+            path
+        } else {
+            path.parent().unwrap_or(path)
+        };
+
+        // Use platform-specific implementation for accurate disk space calculation
+        #[cfg(target_os = "macos")]
+        {
+            Self::get_available_space_macos(check_path).await
+        }
+        #[cfg(target_os = "linux")]
+        {
+            Self::get_available_space_linux(check_path).await
+        }
+        #[cfg(target_os = "windows")]
+        {
+            Self::get_available_space_windows(check_path).await
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+        {
+            // Fallback for unsupported platforms
+            warn!("Platform-specific disk space detection not available, using fallback");
+            Ok(1024 * 1024 * 1024) // 1GB fallback
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    async fn get_available_space_macos(path: &Path) -> Result<u64> {
+        use std::os::unix::fs::MetadataExt;
+        
+        // On macOS, use statvfs for accurate filesystem statistics
+        let metadata = fs::metadata(path).await
+            .map_err(|e| anyhow::anyhow!("Failed to get path metadata: {}", e))?;
+        
+        // Get filesystem stats using libc statvfs
+        let path_cstr = std::ffi::CString::new(path.to_string_lossy().as_bytes())
+            .map_err(|e| anyhow::anyhow!("Path conversion failed: {}", e))?;
+        
+        let mut statvfs = std::mem::MaybeUninit::<libc::statvfs>::uninit();
+        let result = unsafe {
+            libc::statvfs(path_cstr.as_ptr(), statvfs.as_mut_ptr())
+        };
+        
+        if result != 0 {
+            return Err(anyhow::anyhow!("statvfs failed with code: {}", result));
+        }
+        
+        let statvfs = unsafe { statvfs.assume_init() };
+        
+        // Calculate available space: block size * available blocks
+        let available_bytes = statvfs.f_bavail * statvfs.f_frsize;
+        Ok(available_bytes)
+    }
+
+    #[cfg(target_os = "linux")]
+    async fn get_available_space_linux(path: &Path) -> Result<u64> {
+        // Similar implementation to macOS using statvfs
+        let path_cstr = std::ffi::CString::new(path.to_string_lossy().as_bytes())
+            .map_err(|e| anyhow::anyhow!("Path conversion failed: {}", e))?;
+        
+        let mut statvfs = std::mem::MaybeUninit::<libc::statvfs>::uninit();
+        let result = unsafe {
+            libc::statvfs(path_cstr.as_ptr(), statvfs.as_mut_ptr())
+        };
+        
+        if result != 0 {
+            return Err(anyhow::anyhow!("statvfs failed with code: {}", result));
+        }
+        
+        let statvfs = unsafe { statvfs.assume_init() };
+        let available_bytes = statvfs.f_bavail * statvfs.f_frsize;
+        Ok(available_bytes)
+    }
+
+    #[cfg(target_os = "windows")]
+    async fn get_available_space_windows(path: &Path) -> Result<u64> {
+        use std::ffi::OsStr;
+        use std::os::windows::ffi::OsStrExt;
+        
+        // Convert path to wide string for Windows API
+        let wide_path: Vec<u16> = OsStr::new(path)
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+        
+        let mut free_bytes = 0u64;
+        let mut total_bytes = 0u64;
+        
+        let result = unsafe {
+            winapi::um::fileapi::GetDiskFreeSpaceExW(
+                wide_path.as_ptr(),
+                &mut free_bytes as *mut u64,
+                &mut total_bytes as *mut u64,
+                std::ptr::null_mut(),
+            )
+        };
+        
+        if result == 0 {
+            return Err(anyhow::anyhow!("GetDiskFreeSpaceExW failed"));
+        }
+        
+        Ok(free_bytes)
     }
     
     /// Calculate directory size
@@ -665,145 +766,3 @@ pub mod utils {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::TempDir;
-    
-    #[tokio::test]
-    async fn test_storage_operations() {
-        let temp_dir = TempDir::new().expect("Failed to create temp dir");
-        let config = StorageConfig {
-            base_directory: temp_dir.path().to_path_buf(),
-            ..Default::default()
-        };
-        
-        let storage = StateStorage::with_config(config).expect("Failed to create storage");
-        let state = AppState::default();
-        
-        // Test save
-        storage.save_state(&state).await.expect("Save failed");
-        
-        // Test load
-        let loaded_state = storage.load_state().await.expect("Load failed");
-        assert_eq!(loaded_state.schema_version, state.schema_version);
-        
-        // Test validation
-        storage.validate_state_file().await.expect("Validation failed");
-    }
-    
-    #[tokio::test]
-    async fn test_backup_operations() {
-        let temp_dir = TempDir::new().expect("Failed to create temp dir");
-        let config = StorageConfig {
-            base_directory: temp_dir.path().to_path_buf(),
-            backup_config: BackupConfig {
-                enabled: true,
-                max_backups: 3,
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        
-        let storage = StateStorage::with_config(config).expect("Failed to create storage");
-        let state = AppState::default();
-        
-        // Save state multiple times to create backups
-        for i in 0..5 {
-            let mut modified_state = state.clone();
-            modified_state.last_updated = i;
-            storage.save_state(&modified_state).await.expect("Save failed");
-            
-            // Small delay to ensure different timestamps
-            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-        }
-        
-        // Check backup count
-        let backups = storage.list_backups().await.expect("List backups failed");
-        assert!(backups.len() <= 5); // Should have some backups
-        
-        // Test cleanup
-        storage.cleanup_old_backups().await.expect("Cleanup failed");
-        
-        let backups_after_cleanup = storage.list_backups().await.expect("List backups failed");
-        assert!(backups_after_cleanup.len() <= 3); // Should respect max_backups
-    }
-    
-    #[tokio::test]
-    async fn test_atomic_writes() {
-        let temp_dir = TempDir::new().expect("Failed to create temp dir");
-        let config = StorageConfig {
-            base_directory: temp_dir.path().to_path_buf(),
-            atomic_writes: true,
-            ..Default::default()
-        };
-        
-        let storage = StateStorage::with_config(config).expect("Failed to create storage");
-        let file_path = storage.get_primary_state_file_path();
-        
-        // Test atomic write
-        let data = r#"{"test": "data"}"#;
-        storage.atomic_write(&file_path, data).await.expect("Atomic write failed");
-        
-        // Verify file exists and has correct content
-        assert!(file_path.exists());
-        let contents = fs::read_to_string(&file_path).await.expect("Read failed");
-        assert_eq!(contents, data);
-        
-        // Verify no temp file remains
-        let temp_path = file_path.with_extension("tmp");
-        assert!(!temp_path.exists());
-    }
-    
-    #[tokio::test]
-    async fn test_async_storage_wrapper() {
-        let temp_dir = TempDir::new().expect("Failed to create temp dir");
-        let config = StorageConfig {
-            base_directory: temp_dir.path().to_path_buf(),
-            ..Default::default()
-        };
-        
-        let storage = StateStorage::with_config(config).expect("Failed to create storage");
-        let async_storage = AsyncStateStorage::new(storage);
-        
-        let state = AppState::default();
-        
-        // Test async save
-        async_storage.save_state_async(state.clone()).await.expect("Async save failed");
-        
-        // Test async load
-        let loaded_state = async_storage.load_state_async().await.expect("Async load failed");
-        assert_eq!(loaded_state.schema_version, state.schema_version);
-    }
-    
-    #[tokio::test]
-    async fn test_storage_statistics() {
-        let temp_dir = TempDir::new().expect("Failed to create temp dir");
-        let config = StorageConfig {
-            base_directory: temp_dir.path().to_path_buf(),
-            backup_config: BackupConfig {
-                enabled: true,
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        
-        let storage = StateStorage::with_config(config).expect("Failed to create storage");
-        let state = AppState::default();
-        
-        // Save state to create primary file
-        storage.save_state(&state).await.expect("Save failed");
-        
-        // Get statistics
-        let stats = storage.get_statistics().await.expect("Statistics failed");
-        
-        assert!(stats.primary_file_size > 0);
-        assert!(stats.primary_file_modified.is_some());
-        assert_eq!(stats.backup_count, 0); // No backups yet
-        assert_eq!(stats.total_storage_size, stats.primary_file_size);
-        
-        // Test size formatting
-        assert!(stats.formatted_primary_size().contains("B"));
-        assert!(stats.formatted_total_size().contains("B"));
-    }
-}

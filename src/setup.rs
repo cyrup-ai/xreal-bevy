@@ -60,9 +60,7 @@ pub fn handle_libusb_check_task(
     mut state: ResMut<LibusbCheckState>,
 ) {
     for (entity, mut task) in task_query.iter_mut() {
-        if let Some(result) =
-            futures_lite::future::block_on(futures_lite::future::poll_once(&mut task.0))
-        {
+        if let Some(result) = bevy::tasks::block_on(bevy::tasks::futures_lite::future::poll_once(&mut task.0)) {
             state.0 = Some(result);
             if !result {
                 info!("🔧 libusb not found. Spawning installation task...");
@@ -80,9 +78,7 @@ pub fn handle_libusb_install_task(
     mut status: ResMut<LibusbInstallStatus>,
 ) {
     for (entity, mut task) in task_query.iter_mut() {
-        if let Some(result) =
-            futures_lite::future::block_on(futures_lite::future::poll_once(&mut task.0))
-        {
+        if let Some(result) = bevy::tasks::block_on(bevy::tasks::futures_lite::future::poll_once(&mut task.0)) {
             status.0 = Some(result);
             commands.entity(entity).despawn();
         }
@@ -95,9 +91,7 @@ pub fn handle_glasses_check_task(
     mut state: ResMut<GlassesConnectionState>,
 ) {
     for (entity, mut task) in task_query.iter_mut() {
-        if let Some(result) =
-            futures_lite::future::block_on(futures_lite::future::poll_once(&mut task.0))
-        {
+        if let Some(result) = bevy::tasks::block_on(bevy::tasks::futures_lite::future::poll_once(&mut task.0)) {
             state.0 = Some(result);
             commands.entity(entity).despawn();
         }
@@ -110,9 +104,7 @@ pub fn handle_cache_check_task(
     mut state: ResMut<CacheValidityState>,
 ) {
     for (entity, mut task) in task_query.iter_mut() {
-        if let Some(result) =
-            futures_lite::future::block_on(futures_lite::future::poll_once(&mut task.0))
-        {
+        if let Some(result) = bevy::tasks::block_on(bevy::tasks::futures_lite::future::poll_once(&mut task.0)) {
             state.0 = Some(result);
             if !result {
                 info!("🗃️ Cache is stale or invalid. Spawning update task...");
@@ -130,9 +122,7 @@ pub fn handle_cache_update_task(
     mut state: ResMut<CacheValidityState>,
 ) {
     for (entity, mut task) in task_query.iter_mut() {
-        if let Some(result) =
-            futures_lite::future::block_on(futures_lite::future::poll_once(&mut task.0))
-        {
+        if let Some(result) = bevy::tasks::block_on(bevy::tasks::futures_lite::future::poll_once(&mut task.0)) {
             if result {
                 state.0 = Some(true);
             }

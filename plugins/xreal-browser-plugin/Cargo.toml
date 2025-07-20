@@ -1,0 +1,38 @@
+[package]
+name = "xreal-browser-plugin"
+version = "0.1.0"
+edition = "2021"
+authors = ["XREAL Team"]
+description = "Browser plugin for XREAL AR glasses with webview integration"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/xreal/xreal-bevy"
+keywords = ["bevy", "plugin", "browser", "webview", "ar"]
+categories = ["game-development", "web-programming"]
+
+[dependencies]
+bevy = { version = "0.16.1", default-features = false, features = [
+    "bevy_render",
+    "bevy_core_pipeline", 
+    "bevy_asset",
+    "bevy_winit",
+    "bevy_text",
+    "bevy_ui",
+    "multi_threaded",
+    "png",
+    "hdr",
+    "ktx2",
+    "zstd",
+    "vorbis",
+    "x11",
+    "file_watcher",
+    "embedded_watcher",
+    "default_font",
+] }
+anyhow = "1.0"
+tracing = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+wgpu = "0.20"
+
+[lib]
+name = "xreal_browser_plugin"
+crate-type = ["cdylib", "rlib"]

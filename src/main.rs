@@ -5,6 +5,10 @@ use bevy::window::WindowPlugin;
 use bevy_egui::EguiPlugin;
 use crossbeam_channel::{bounded, Receiver, Sender};
 
+// Import the new Bevy plugins
+use xreal_browser_plugin::BrowserPlugin;
+use xreal_terminal_plugin::TerminalPlugin;
+
 
 mod capture;
 mod cursor;
@@ -83,6 +87,16 @@ async fn main() -> Result<()> {
         }))
         .add_plugins((EguiPlugin::default(), FrameTimeDiagnosticsPlugin::default()))
         .add_plugins(XRealStereoRenderingPlugin)
+        // Add the new Bevy plugin system
+        .add_plugins((
+            BrowserPlugin::new()
+                .with_default_url("https://example.com".to_string())
+                .with_cache_size(100), // 100MB cache
+            TerminalPlugin::new()
+                .with_shell("/bin/zsh".to_string())
+                .with_font_size(14.0)
+                .with_grid_size(80, 24),
+        ))
         .insert_resource(DataChannel(data_rx))
         .insert_resource(CommandChannel(command_tx))
         .insert_resource(Orientation::default())
@@ -91,7 +105,18 @@ async fn main() -> Result<()> {
         .insert_resource(DisplayModeState::default())
         .insert_resource(RollLockState::default())
         .insert_resource(BrightnessState::default())
-        .insert_resource(ScreenCaptures::new_async().await.unwrap())
+        .insert_resource(match ScreenCaptures::new_async().await {
+            Ok(screen_captures) => {
+                info!("✅ Screen capture initialized successfully");
+                screen_captures
+            }
+            Err(e) => {
+                error!("❌ Failed to initialize screen capture: {}", e);
+                error!("    This may be due to missing permissions or unsupported platform");
+                error!("    Continuing with fallback capture system");
+                ScreenCaptures::default()
+            }
+        })
         .add_systems(
             OnEnter(AppState::Running),
             (initialize_xreal_device, setup_3d_scene, spawn_head_cursor).chain(),

@@ -11,6 +11,7 @@ use scap::{
 };
 
 #[derive(Component)]
+#[allow(dead_code)]
 pub struct CaptureTask(pub Task<CommandQueue>);
 
 #[derive(Resource)]
@@ -19,7 +20,9 @@ pub struct ScreenCaptures {
     pub capture_requested: bool,
     capturer: Option<Capturer>,
     // Pre-allocated buffer pool for zero hot-path allocations
+    #[allow(dead_code)]
     rgba_buffer: Vec<u8>,
+    #[allow(dead_code)]
     buffer_capacity: usize,
 }
 
@@ -87,6 +90,7 @@ impl ScreenCaptures {
     }
 
     #[inline]
+    #[allow(dead_code)]
     pub fn new() -> Result<Self> {
         // Check platform support first
         if !is_supported() {
@@ -177,6 +181,7 @@ impl ScreenCaptures {
 
     /// Synchronous wrapper that provides fallback when async detection isn't available
     #[inline]
+    #[allow(dead_code)]
     fn detect_optimal_framerate() -> u32 {
         // Safe fallback for synchronous initialization
         // The async version should be preferred when possible
@@ -184,6 +189,7 @@ impl ScreenCaptures {
     }
 
     /// Spawn async capture task for non-blocking screen capture
+    #[allow(dead_code)]
     pub fn spawn_capture_task(&self, entity: Entity) -> Option<CaptureTask> {
         if self.capturer.is_none() {
             return None;
@@ -258,6 +264,7 @@ impl ScreenCaptures {
     /// Convert scap frame to Bevy Image using pre-allocated buffer for zero allocations
     /// Uses vectorized operations and pre-allocated buffer for blazing-fast conversion
     #[inline]
+    #[allow(dead_code)]
     fn frame_to_bevy_image_zero_alloc(&mut self, frame: Frame) -> Result<Image> {
         use bevy::render::{
             render_asset::RenderAssetUsages,

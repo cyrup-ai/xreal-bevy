@@ -1,1 +1,0 @@
-std::ptr::NonNull<core_graphics::sys::macos::CGEventSource>

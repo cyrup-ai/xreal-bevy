@@ -6,6 +6,8 @@
 //! - Mouse and keyboard emulation
 //! - Input configuration and state management
 
+#![allow(dead_code)]
+
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 

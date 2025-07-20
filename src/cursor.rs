@@ -5,6 +5,7 @@ use bevy::prelude::*;
 /// Head-tracked cursor component for AR interaction
 #[derive(Component)]
 pub struct HeadCursor {
+    #[allow(dead_code)]
     pub size: f32,
     pub color: Color,
     pub hit_screen: Option<usize>,

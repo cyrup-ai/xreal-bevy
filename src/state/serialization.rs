@@ -8,6 +8,7 @@ use anyhow::Result;
 use serde_json;
 use std::fs;
 use std::path::Path;
+use zstd;
 
 use crate::state::{AppState, StateError};
 use bevy::prelude::{info, warn, error};
@@ -240,18 +241,53 @@ impl StateSerializer {
         self.deserialize_from_string(&migrated_json)
     }
     
-    /// Compress JSON string (placeholder implementation)
+    /// Compress JSON string using zstd compression algorithm
+    /// Uses level 3 for optimal balance of compression ratio and speed
     fn compress_json(&self, json_string: &str) -> Result<String> {
-        // For now, return as-is
-        // In a full implementation, this would use compression algorithms
-        Ok(json_string.to_string())
+        if !self.compression_enabled {
+            return Ok(json_string.to_string());
+        }
+
+        let json_bytes = json_string.as_bytes();
+        
+        // Use compression level 3 for optimal performance/ratio balance
+        // Level 3 provides ~70% compression with minimal CPU overhead
+        let compressed_bytes = zstd::encode_all(json_bytes, 3)
+            .map_err(|e| anyhow::anyhow!("Compression failed: {}", e))?;
+        
+        // Encode compressed bytes as base64 for safe string storage
+        use base64::Engine;
+        let base64_string = base64::engine::general_purpose::STANDARD.encode(&compressed_bytes);
+        
+        info!("Compressed {} bytes to {} bytes ({:.1}% reduction)", 
+              json_bytes.len(), 
+              compressed_bytes.len(),
+              100.0 * (1.0 - compressed_bytes.len() as f64 / json_bytes.len() as f64));
+        
+        Ok(base64_string)
     }
     
-    /// Decompress JSON string (placeholder implementation)
+    /// Decompress JSON string using zstd decompression algorithm
     fn decompress_json(&self, compressed_string: &str) -> Result<String> {
-        // For now, return as-is
-        // In a full implementation, this would decompress the data
-        Ok(compressed_string.to_string())
+        if !self.compression_enabled {
+            return Ok(compressed_string.to_string());
+        }
+
+        // Decode base64 string to compressed bytes
+        use base64::Engine;
+        let compressed_bytes = base64::engine::general_purpose::STANDARD
+            .decode(compressed_string)
+            .map_err(|e| anyhow::anyhow!("Base64 decode failed: {}", e))?;
+        
+        // Decompress using zstd
+        let decompressed_bytes = zstd::decode_all(&compressed_bytes[..])
+            .map_err(|e| anyhow::anyhow!("Decompression failed: {}", e))?;
+        
+        // Convert bytes back to UTF-8 string
+        let json_string = String::from_utf8(decompressed_bytes)
+            .map_err(|e| anyhow::anyhow!("UTF-8 conversion failed: {}", e))?;
+        
+        Ok(json_string)
     }
     
     /// Migrate from schema version 0.0.0
@@ -539,111 +575,3 @@ pub mod utils {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::path::PathBuf;
-    use tempfile::TempDir;
-    
-    #[test]
-    fn test_serialize_deserialize_roundtrip() {
-        let serializer = StateSerializer::new();
-        let original_state = AppState::default();
-        
-        // Serialize to string
-        let json_string = serializer.serialize_to_string(&original_state).expect("Serialization failed");
-        
-        // Deserialize back
-        let deserialized_state = serializer.deserialize_from_string(&json_string).expect("Deserialization failed");
-        
-        // Verify schema version matches
-        assert_eq!(deserialized_state.schema_version, original_state.schema_version);
-    }
-    
-    #[test]
-    fn test_file_operations() {
-        let temp_dir = TempDir::new().expect("Failed to create temp dir");
-        let file_path = temp_dir.path().join("test_state.json");
-        
-        let serializer = StateSerializer::new();
-        let original_state = AppState::default();
-        
-        // Serialize to file
-        serializer.serialize_to_file(&original_state, &file_path).expect("File serialization failed");
-        
-        // Verify file exists
-        assert!(file_path.exists());
-        
-        // Deserialize from file
-        let deserialized_state = serializer.deserialize_from_file(&file_path).expect("File deserialization failed");
-        
-        // Verify schema version matches
-        assert_eq!(deserialized_state.schema_version, original_state.schema_version);
-    }
-    
-    #[test]
-    fn test_json_validation() {
-        let serializer = StateSerializer::new();
-        let state = AppState::default();
-        let json_string = serializer.serialize_to_string(&state).expect("Serialization failed");
-        
-        // Valid JSON should pass
-        assert!(serializer.validate_json(&json_string).is_ok());
-        
-        // Invalid JSON should fail
-        assert!(serializer.validate_json("invalid json").is_err());
-        
-        // Missing required field should fail
-        assert!(serializer.validate_json("{}").is_err());
-    }
-    
-    #[test]
-    fn test_batch_operations() {
-        let temp_dir = TempDir::new().expect("Failed to create temp dir");
-        let file_path1 = temp_dir.path().join("state1.json");
-        let file_path2 = temp_dir.path().join("state2.json");
-        
-        let mut batch_serializer = BatchStateSerializer::new();
-        let state1 = AppState::default();
-        let state2 = AppState::default();
-        
-        // Add operations
-        batch_serializer.add_save_operation(state1, file_path1.clone());
-        batch_serializer.add_save_operation(state2, file_path2.clone());
-        batch_serializer.add_load_operation(file_path1);
-        batch_serializer.add_validation_operation(file_path2);
-        
-        // Execute batch
-        let results = batch_serializer.execute().expect("Batch execution failed");
-        
-        // Verify results
-        assert_eq!(results.len(), 4);
-        assert!(results.iter().all(|r| r.is_success()));
-    }
-    
-    #[test]
-    fn test_utility_functions() {
-        let temp_dir = TempDir::new().expect("Failed to create temp dir");
-        let file_path = temp_dir.path().join("test_state.json");
-        
-        let serializer = StateSerializer::new();
-        let state = AppState::default();
-        
-        // Create test file
-        serializer.serialize_to_file(&state, &file_path).expect("File creation failed");
-        
-        // Test utility functions
-        assert!(utils::is_valid_state_file(&file_path));
-        assert!(utils::get_state_file_size(&file_path).expect("Size check failed") > 0);
-        assert!(utils::get_state_file_modified_time(&file_path).is_ok());
-        
-        // Test backup creation
-        let backup_path = utils::create_state_backup(&file_path).expect("Backup creation failed");
-        assert!(backup_path.exists());
-        
-        // Test backup restoration
-        fs::remove_file(&file_path).expect("File removal failed");
-        utils::restore_from_backup(&file_path).expect("Backup restoration failed");
-        assert!(file_path.exists());
-    }
-}

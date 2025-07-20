@@ -117,14 +117,12 @@ pub fn handle_capture_tasks(
     mut jitter_metrics: ResMut<crate::JitterMetrics>,
     time: Res<Time>,
 ) {
-    use bevy::tasks::{block_on, futures_lite::future};
-
     // Use high-precision timing for capture interval measurement
     let current_time = time.elapsed_secs_f64() * 1000.0;
 
     for mut task in &mut tasks {
-        // Poll the task non-blocking - this is the only acceptable use of block_on for polling
-        if let Some(mut command_queue) = block_on(future::poll_once(&mut task.0)) {
+        // Poll the task non-blocking using proper Bevy async pattern
+        if let Some(mut command_queue) = bevy::tasks::block_on(bevy::tasks::futures_lite::future::poll_once(&mut task.0)) {
             // Measure screen capture timing for jitter analysis
             if jitter_metrics.last_capture_time > 0.0 {
                 let capture_interval = current_time - jitter_metrics.last_capture_time;
