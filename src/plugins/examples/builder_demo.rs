@@ -3,7 +3,7 @@
 //! This file shows various examples of using the XREAL plugin builder system
 //! to create self-documenting, type-safe plugin configurations.
 
-use crate::{plugin_metadata, plugins::{PluginBuilder, PluginMetadata, PluginCapabilities}};
+use crate::{plugin_metadata, plugins::{PluginBuilder, PluginMetadata, PluginCapabilitiesFlags}};
 
 /// Example 1: Simple minimal plugin
 /// 
@@ -151,14 +151,13 @@ impl crate::plugins::PluginApp for ExamplePlugin {
     fn name(&self) -> &str { "Demo Plugin" }
     fn version(&self) -> &str { "1.0.0" }
     
-    fn capabilities(&self) -> PluginCapabilities {
-        // Reuse the same builder pattern for consistency
-        PluginBuilder::new()
-            .requires_network()
-            .also_supports_audio()
-            .also_supports_transparency()
-            .also_update_rate(30)
-            .capabilities() // Extract just the capabilities
+    fn capabilities(&self) -> PluginCapabilitiesFlags {
+        use crate::plugins::PluginCapabilitiesFlags;
+        
+        PluginCapabilitiesFlags::new()
+            .with_flag(PluginCapabilitiesFlags::REQUIRES_NETWORK_ACCESS)
+            .with_flag(PluginCapabilitiesFlags::SUPPORTS_AUDIO)
+            .with_flag(PluginCapabilitiesFlags::SUPPORTS_TRANSPARENCY)
     }
     
     // ... other required methods would be implemented here

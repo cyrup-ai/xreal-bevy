@@ -6,6 +6,7 @@ use bevy::{
     prelude::*,
     tasks::{AsyncComputeTaskPool, Task}
 };
+use async_process::Command;
 
 const CACHE_FILE: &str = "/tmp/.xreal_libusb_check";
 const CACHE_DURATION_HOURS: u64 = 24;
@@ -138,16 +139,26 @@ pub fn async_check_libusb_task() -> LibusbCheckTask {
     let task = thread_pool.spawn(async move {
         let mut command_queue = CommandQueue::default();
         
-        // Use async-process::Command for non-blocking system call
-        let result = async_process::Command::new("pkg-config")
-            .args(&["--exists", "libusb-1.0"])
-            .output()
-            .await;
-            
-        let is_installed = result
-            .map(|output| output.status.success())
-            .unwrap_or(false);
-            
+        // Check if libusb is installed using pkg-config
+        let is_installed = match Command::new("pkg-config")
+            .arg("--exists")
+            .arg("libusb-1.0")
+            .status()
+            .await
+        {
+            Ok(status) => status.success(),
+            Err(_) => {
+                // If pkg-config fails, try alternative detection methods
+                Command::new("brew")
+                    .arg("list")
+                    .arg("libusb")
+                    .status()
+                    .await
+                    .map(|status| status.success())
+                    .unwrap_or(false)
+            }
+        };
+        
         command_queue.push(move |world: &mut World| {
             if let Some(mut libusb_state) = world.get_resource_mut::<LibusbCheckState>() {
                 libusb_state.is_installed = Some(is_installed);
@@ -184,20 +195,15 @@ pub fn async_install_libusb_task() -> LibusbInstallTask {
             return command_queue;
         }
         
-        let brew_output = match brew_check {
-            Ok(output) => output,
-            Err(_) => {
-                command_queue.push(move |world: &mut World| {
-                    if let Some(mut install_status) = world.get_resource_mut::<LibusbInstallStatus>() {
-                        install_status.install_result = Some(Err("Failed to execute which brew command".to_string()));
-                        install_status.is_installing = false;
-                    }
-                });
-                return command_queue;
-            }
-        };
+        // Check if Homebrew is installed
+        let brew_installed = Command::new("which")
+            .arg("brew")
+            .status()
+            .await
+            .map(|status| status.success())
+            .unwrap_or(false);
         
-        if !brew_output.status.success() {
+        if !brew_installed {
             command_queue.push(move |world: &mut World| {
                 if let Some(mut install_status) = world.get_resource_mut::<LibusbInstallStatus>() {
                     install_status.install_result = Some(Err("Homebrew not found. Please install Homebrew first".to_string()));
@@ -207,46 +213,38 @@ pub fn async_install_libusb_task() -> LibusbInstallTask {
             return command_queue;
         }
         
-        // Install libusb via brew
-        let install_result = async_process::Command::new("brew")
-            .args(&["install", "libusb"])
-            .output()
+        // Install libusb using Homebrew
+        let install_result = Command::new("brew")
+            .arg("install")
+            .arg("libusb")
+            .status()
             .await;
-            
+        
+        // Handle the installation result
         match install_result {
-            Ok(output) => {
-                if output.status.success() {
-                    command_queue.push(move |world: &mut World| {
-                        if let Some(mut install_status) = world.get_resource_mut::<LibusbInstallStatus>() {
-                            install_status.install_result = Some(Ok(()));
-                            install_status.is_installing = false;
-                        }
-                    });
-                } else {
-                    let stderr = String::from_utf8_lossy(&output.stderr);
-                    if stderr.contains("already installed") {
+            Ok(status) if status.success() => {
+                        // Installation successful
                         command_queue.push(move |world: &mut World| {
                             if let Some(mut install_status) = world.get_resource_mut::<LibusbInstallStatus>() {
                                 install_status.install_result = Some(Ok(()));
                                 install_status.is_installing = false;
                             }
                         });
-                    } else {
-                        let error_msg = format!("Failed to install libusb: {}", stderr);
-                        command_queue.push(move |world: &mut World| {
-                            if let Some(mut install_status) = world.get_resource_mut::<LibusbInstallStatus>() {
-                                install_status.install_result = Some(Err(error_msg));
-                                install_status.is_installing = false;
-                            }
-                        });
-                    }
-                }
-            }
+                    },
             Err(e) => {
-                let error_msg = format!("Failed to execute brew command: {}", e);
+                // Installation failed
                 command_queue.push(move |world: &mut World| {
                     if let Some(mut install_status) = world.get_resource_mut::<LibusbInstallStatus>() {
-                        install_status.install_result = Some(Err(error_msg));
+                        install_status.install_result = Some(Err(format!("Failed to install libusb: {}", e)));
+                        install_status.is_installing = false;
+                    }
+                });
+            }
+            Ok(_status) => {
+                // Installation failed with non-zero exit code
+                command_queue.push(move |world: &mut World| {
+                    if let Some(mut install_status) = world.get_resource_mut::<LibusbInstallStatus>() {
+                        install_status.install_result = Some(Err("Failed to install libusb: brew install failed".to_string()));
                         install_status.is_installing = false;
                     }
                 });
@@ -267,20 +265,27 @@ pub fn async_check_glasses_task() -> GlassesCheckTask {
     let task = thread_pool.spawn(async move {
         let mut command_queue = CommandQueue::default();
         
-        // Check USB devices for XREAL/Nreal identifiers using async system_profiler
-        let lsusb_result = async_process::Command::new("system_profiler")
-            .args(&["SPUSBDataType"])
+        // Use Desktop Commander to check USB devices for XREAL/Nreal identifiers
+        let _command = "system_profiler SPUSBDataType";
+        let _timeout_ms = 10000; // 10 second timeout
+        
+        // Check glasses connection using system_profiler
+        let process_result = Command::new("system_profiler")
+            .arg("SPUSBDataType")
             .output()
             .await;
-            
-        let is_connected = if let Ok(output) = lsusb_result {
-            let usb_info = String::from_utf8_lossy(&output.stdout);
-            usb_info.to_lowercase().contains("nreal") || 
-            usb_info.to_lowercase().contains("xreal") ||
-            usb_info.to_lowercase().contains("0x3318") ||  // XREAL vendor ID
-            usb_info.to_lowercase().contains("0x0486")     // Alternative vendor ID
-        } else {
-            false
+        
+        // Check if glasses are connected
+        let is_connected = match process_result {
+            Ok(output) if output.status.success() => {
+                // Successfully got USB info, check for XREAL/Nreal devices
+                let usb_info = String::from_utf8_lossy(&output.stdout).to_lowercase();
+                usb_info.contains("nreal") || 
+                usb_info.contains("xreal") ||
+                usb_info.contains("0x3318") ||  // XREAL vendor ID
+                usb_info.contains("0x0486")     // Alternative vendor ID
+            }
+            _ => false // Command failed or process error
         };
         
         command_queue.push(move |world: &mut World| {

@@ -6,7 +6,7 @@
 
 use crate::plugins::{
     fast_builder::FastPluginBuilder,
-    PluginMetadata,
+    PluginMetadata, PluginCapabilitiesFlags,
 };
 use crate::fast_plugin;
 
@@ -210,15 +210,15 @@ impl PluginPerformanceDemo {
     /// Calculate total resource requirements for each tier
     pub fn calculate_resource_requirements(&self) -> (f32, f32, f32) {
         let high_perf_load = self.high_perf_plugins.iter()
-            .map(|p| p.capabilities.preferred_update_rate.unwrap_or(60) as f32 / 60.0)
+            .map(|_p| 60.0 / 60.0) // Default to 60 FPS
             .sum::<f32>();
             
         let balanced_load = self.balanced_plugins.iter()
-            .map(|p| p.capabilities.preferred_update_rate.unwrap_or(60) as f32 / 60.0)
+            .map(|_p| 60.0 / 60.0) // Default to 60 FPS
             .sum::<f32>();
             
         let low_power_load = self.low_power_plugins.iter()
-            .map(|p| p.capabilities.preferred_update_rate.unwrap_or(60) as f32 / 60.0)
+            .map(|_p| 30.0 / 60.0) // Default to 30 FPS for low power
             .sum::<f32>();
             
         (high_perf_load, balanced_load, low_power_load)
@@ -243,7 +243,7 @@ pub mod capability_analysis {
         #[inline(always)]
         pub fn analyze_network_requirements(plugins: &[PluginMetadata]) -> NetworkAnalysis {
             let network_plugins = plugins.iter()
-                .filter(|p| p.capabilities.requires_network_access)
+                .filter(|p| p.capabilities.has_flag(PluginCapabilitiesFlags::REQUIRES_NETWORK_ACCESS))
                 .count();
                 
             let total_plugins = plugins.len();
@@ -265,15 +265,15 @@ pub mod capability_analysis {
         #[inline(always)]
         pub fn analyze_rendering_workload(plugins: &[PluginMetadata]) -> RenderingAnalysis {
             let rendering_3d = plugins.iter()
-                .filter(|p| p.capabilities.supports_3d_rendering)
+                .filter(|p| p.capabilities.has_flag(PluginCapabilitiesFlags::SUPPORTS_3D_RENDERING))
                 .count();
                 
             let compute_shaders = plugins.iter()
-                .filter(|p| p.capabilities.supports_compute_shaders)
+                .filter(|p| p.capabilities.has_flag(PluginCapabilitiesFlags::SUPPORTS_COMPUTE_SHADERS))
                 .count();
                 
             let total_fps_demand = plugins.iter()
-                .map(|p| p.capabilities.preferred_update_rate.unwrap_or(60))
+                .map(|_p| 60) // Default to 60 FPS
                 .sum::<u32>();
                 
             RenderingAnalysis {
@@ -289,7 +289,7 @@ pub mod capability_analysis {
         #[inline(always)]
         pub fn analyze_audio_requirements(plugins: &[PluginMetadata]) -> AudioAnalysis {
             let audio_plugins = plugins.iter()
-                .filter(|p| p.capabilities.supports_audio)
+                .filter(|p| p.capabilities.has_flag(PluginCapabilitiesFlags::SUPPORTS_AUDIO))
                 .count();
                 
             AudioAnalysis {

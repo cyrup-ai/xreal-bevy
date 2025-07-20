@@ -1,5 +1,6 @@
 use anyhow::Result;
-use bevy::{prelude::*, app::PluginGroupBuilder};
+use bevy::prelude::*;
+use bevy::app::PluginGroupBuilder;
 use libloading::{Library, Symbol};
 use std::{
     collections::HashMap,
@@ -9,13 +10,10 @@ use std::{
 use crossbeam_channel::{Receiver, Sender, bounded};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 
-use crate::{
-    tracking::{Orientation, CalibrationState},
-};
+use crate::tracking::{Orientation, CalibrationState};
 use super::{
-    PluginApp, PluginInstance, PluginMetadata, PluginSystemEvent, PluginError,
-    PluginSystemConfig, PluginState, context::{OrientationAccess, 
-    PluginResourceManager, PluginPerformanceTracker}
+    PluginApp, PluginInstance, PluginMetadata, PluginError,
+    PluginSystemConfig, PluginState, context::OrientationAccess
 };
 
 /// Plugin registry managing dynamic loading and Bevy integration
@@ -80,7 +78,7 @@ impl PluginRegistry {
                 if self.is_plugin_library(&path) {
                     match self.extract_metadata(&path) {
                         Ok(metadata) => {
-                            self.metadata_cache.insert(metadata.id.clone(), metadata.clone());
+                            self.metadata_cache.insert(metadata.id.as_str().to_string(), metadata.clone());
                             discovered.push(metadata);
                         }
                         Err(e) => {
@@ -192,6 +190,16 @@ impl PluginRegistry {
             .collect()
     }
     
+    /// List all plugin IDs (regardless of state)
+    pub fn list_all_plugin_ids(&self) -> Vec<String> {
+        self.instances.keys().cloned().collect()
+    }
+    
+    /// Register a plugin instance directly
+    pub fn register_plugin(&mut self, plugin_id: String, instance: PluginInstance) {
+        self.instances.insert(plugin_id, instance);
+    }
+    
     /// Update plugin with latest XREAL data
     pub fn update_plugin_systems(&mut self, orientation: &Orientation, calibration: &CalibrationState) {
         // Send latest data to all active plugins
@@ -262,9 +270,9 @@ impl PluginRegistry {
     
     /// Validate plugin dependencies
     fn validate_dependencies(&self, metadata: &PluginMetadata) -> Result<()> {
-        for dep in &metadata.dependencies {
-            if !self.instances.contains_key(dep) {
-                return Err(PluginError::MissingDependency(dep.clone()).into());
+        for dep in metadata.dependencies.iter() {
+            if !self.instances.contains_key(dep.as_str()) {
+                return Err(PluginError::MissingDependency(dep.as_str().to_string()).into());
             }
         }
         Ok(())
@@ -352,8 +360,8 @@ impl PluginGroup for DynamicPluginGroup {
             Ok(plugins) => {
                 info!("Auto-loading {} discovered plugins", plugins.len());
                 for metadata in plugins {
-                    if let Err(e) = self.registry.load_plugin(&metadata.id) {
-                        error!("Failed to auto-load plugin {}: {}", metadata.id, e);
+                    if let Err(e) = self.registry.load_plugin(metadata.id.as_str()) {
+                        error!("Failed to auto-load plugin {}: {}", metadata.id.as_str(), e);
                     }
                 }
             }
@@ -366,66 +374,12 @@ impl PluginGroup for DynamicPluginGroup {
     }
 }
 
-/// Bevy system for plugin discovery and lifecycle management
-pub fn plugin_discovery_system(
-    mut registry: ResMut<PluginRegistry>,
-    _plugin_events: EventWriter<PluginSystemEvent>,
-) {
-    // Process hot reload requests
-    if let Err(e) = registry.process_hot_reload() {
-        error!("Hot reload processing failed: {}", e);
-    }
-    
-    // Periodic plugin discovery (every 30 seconds in debug mode)
-    if registry.config.enable_hot_reload {
-        // In full implementation, this would use a timer resource
-        // For now, showing the integration pattern
-    }
-}
-
-/// Bevy system for plugin lifecycle management
-pub fn plugin_lifecycle_system(
-    mut registry: ResMut<PluginRegistry>,
-    orientation: Res<Orientation>,
-    calibration: Res<CalibrationState>,
-    mut plugin_events: EventWriter<PluginSystemEvent>,
-    _resource_manager: ResMut<PluginResourceManager>,
-    performance_tracker: ResMut<PluginPerformanceTracker>,
-) {
-    // Update plugins with latest XREAL data
-    registry.update_plugin_systems(&orientation, &calibration);
-    
-    // Monitor plugin health and performance
-    let active_plugins = registry.list_active_plugins();
-    for plugin_id in &active_plugins {
-        if let Some(_instance) = registry.get_plugin(plugin_id) {
-            // Check if plugin is still responsive
-            if !performance_tracker.is_plugin_performing_well(plugin_id) {
-                warn!("Plugin {} is experiencing performance issues", plugin_id);
-                plugin_events.write(PluginSystemEvent::PluginError {
-                    id: plugin_id.to_string(),
-                    error: "Performance degradation detected".to_string(),
-                });
-            }
-        }
-    }
-}
-
-/// System to cleanup plugin resources on shutdown
-pub fn plugin_cleanup_system(
-    mut registry: ResMut<PluginRegistry>,
-    mut resource_manager: ResMut<PluginResourceManager>,
-    mut performance_tracker: ResMut<PluginPerformanceTracker>,
-) {
-    // Cleanup all plugins on shutdown
-    let plugin_ids: Vec<String> = registry.instances.keys().cloned().collect();
-    
-    for plugin_id in plugin_ids {
-        if let Err(e) = registry.unload_plugin(&plugin_id) {
-            error!("Error unloading plugin {} during shutdown: {}", plugin_id, e);
-        }
-        
-        resource_manager.cleanup_plugin(&plugin_id);
-        performance_tracker.cleanup_plugin(&plugin_id);
-    }
-}
+// NOTE: The old PluginRegistry systems have been removed to avoid conflicts
+// with the new FastPluginRegistry implementation. The following systems were
+// replaced by equivalent systems in lifecycle.rs that use FastPluginRegistry:
+// - plugin_discovery_system -> lifecycle::plugin_health_monitoring_system
+// - plugin_lifecycle_system -> lifecycle::plugin_lifecycle_system
+// - plugin_cleanup_system -> lifecycle::plugin_resource_coordination_system
+//
+// This legacy registry implementation is preserved for reference but is not
+// actively used in the current system.

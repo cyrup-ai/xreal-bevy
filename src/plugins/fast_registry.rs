@@ -14,8 +14,9 @@ use bevy::prelude::*;
 use std::collections::HashMap;
 
 use super::{
-    PluginApp, PluginMetadata, PluginCapabilities, PluginSystemConfig,
-    fast_data::{AtomicPluginState, LockFreeRingBuffer, SmallString},
+    PluginApp, PluginMetadata, PluginCapabilitiesFlags, PluginSystemConfig,
+    fast_data::{AtomicPluginState, LockFreeRingBuffer, SmallString, PluginId, PluginName, 
+                PluginVersion, PluginDescription, PluginAuthor, PluginDependencies},
 };
 
 // Thread-safe wrapper for plugin app
@@ -38,9 +39,9 @@ const MAX_EVENTS: usize = 1024;
 #[repr(align(64))]
 pub struct PluginEntry {
     /// Plugin metadata (must be first for cache efficiency)
-    metadata: PluginMetadata,
+    pub metadata: PluginMetadata,
     /// Atomic plugin state
-    state: AtomicPluginState,
+    pub state: AtomicPluginState,
     /// Plugin application instance (thread-safe wrapper)
     app: AtomicPtr<ThreadSafePluginApp>,
     /// Load timestamp
@@ -101,6 +102,18 @@ impl PluginEntry {
     #[inline(always)]
     fn error_count(&self) -> usize {
         self.error_count.load(Ordering::Relaxed)
+    }
+    
+    /// Get current plugin state
+    #[inline(always)]
+    pub fn get_state(&self) -> u64 {
+        self.state.get_lifecycle_state()
+    }
+    
+    /// Get plugin load time as duration since UNIX epoch
+    #[inline(always)]
+    pub fn get_load_time(&self) -> std::time::Duration {
+        std::time::Duration::from_micros(self.load_time)
     }
 }
 
@@ -184,14 +197,14 @@ impl FastPluginRegistry {
             
             for entry in &mut entries {
                 entry.write(PluginEntry::new(PluginMetadata {
-                    id: String::new(),
-                    name: String::new(),
-                    version: String::new(),
-                    description: String::new(),
-                    author: String::new(),
-                    capabilities: PluginCapabilities::default(),
-                    dependencies: Vec::new(),
-                    minimum_engine_version: String::new(),
+                    id: PluginId::from_str("").unwrap_or_default(),
+                    name: PluginName::from_str("").unwrap_or_default(),
+                    version: PluginVersion::from_str("").unwrap_or_default(),
+                    description: PluginDescription::from_str("").unwrap_or_default(),
+                    author: PluginAuthor::from_str("").unwrap_or_default(),
+                    capabilities: PluginCapabilitiesFlags::default(),
+                    dependencies: PluginDependencies::new(),
+                    minimum_engine_version: PluginVersion::from_str("").unwrap_or_default(),
                     icon_path: None,
                     library_path: std::path::PathBuf::new(),
                 }));
@@ -206,7 +219,7 @@ impl FastPluginRegistry {
             lookup_table: HashMap::with_capacity(MAX_PLUGINS),
             event_queue: LockFreeRingBuffer::new(),
             max_frame_time_us: 16_667, // ~60 FPS in microseconds
-            max_memory_mb: config.resource_limits.max_plugin_memory_mb,
+            max_memory_mb: config.resource_limits.max_memory_mb as u64,
             config,
             total_loads: AtomicUsize::new(0),
             total_unloads: AtomicUsize::new(0),
@@ -260,7 +273,7 @@ impl FastPluginRegistry {
         entry.app.store(app_ptr, Ordering::Release);
         
         // Update lookup table
-        self.lookup_table.insert(metadata.id.clone(), plugin_index);
+        self.lookup_table.insert(metadata.id.as_str().to_string(), plugin_index);
         
         // Increment active count
         self.active_count.fetch_add(1, Ordering::Release);
@@ -268,12 +281,12 @@ impl FastPluginRegistry {
         
         // Emit event
         let event = FastPluginEvent::PluginLoaded {
-            plugin_id: SmallString::from_str(&metadata.id),
+            plugin_id: SmallString::from_str(metadata.id.as_str()).unwrap_or_default(),
             load_time_us: entry.load_time,
         };
         let _ = self.event_queue.try_push(event);
         
-        info!("🚀 Plugin '{}' registered at index {} (ultra-fast path)", metadata.name, plugin_index);
+        info!("🚀 Plugin '{}' registered at index {} (ultra-fast path)", metadata.name.as_str(), plugin_index);
         
         Ok(plugin_index)
     }
@@ -329,7 +342,7 @@ impl FastPluginRegistry {
         
         // Emit event
         let event = FastPluginEvent::PluginUnloaded {
-            plugin_id: SmallString::from_str(plugin_id),
+            plugin_id: SmallString::from_str(plugin_id).unwrap_or_default(),
             run_time_ms,
         };
         let _ = self.event_queue.try_push(event);
@@ -404,7 +417,7 @@ impl FastPluginRegistry {
             let threshold_ms = self.max_frame_time_us as f32 / 1000.0;
             
             let event = FastPluginEvent::PerformanceViolation {
-                plugin_id: SmallString::from_str(plugin_id),
+                plugin_id: SmallString::from_str(plugin_id).unwrap_or_default(),
                 avg_frame_time_ms: avg_time_ms,
                 threshold_ms,
             };
@@ -426,8 +439,8 @@ impl FastPluginRegistry {
         self.total_errors.fetch_add(1, Ordering::Relaxed);
         
         let event = FastPluginEvent::PluginError {
-            plugin_id: SmallString::from_str(plugin_id),
-            error: SmallString::from_str(error),
+            plugin_id: SmallString::from_str(plugin_id).unwrap_or_default(),
+            error: SmallString::from_str(error).unwrap_or_default(),
             error_count: entry.error_count() as u32,
         };
         let _ = self.event_queue.try_push(event);
@@ -454,7 +467,7 @@ impl FastPluginRegistry {
     /// This is a zero-allocation operation that processes events
     /// in-place.
     #[inline]
-    pub fn drain_events(&self) -> Vec<FastPluginEvent> {
+    pub fn drain_events(&mut self) -> Vec<FastPluginEvent> {
         let mut events = Vec::with_capacity(64); // Pre-allocate reasonable capacity
         
         while let Some(event) = self.event_queue.try_pop() {
@@ -538,7 +551,7 @@ pub struct PluginPerformanceSummary {
 /// Processes events from the lock-free event queue with minimal overhead.
 #[inline]
 pub fn fast_plugin_event_system(
-    registry: Res<FastPluginRegistry>,
+    mut registry: ResMut<FastPluginRegistry>,
     mut bevy_events: EventWriter<crate::plugins::PluginLifecycleEvent>,
 ) {
     // Drain events from the lock-free queue

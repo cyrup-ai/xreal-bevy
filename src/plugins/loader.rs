@@ -8,7 +8,7 @@ use std::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::{PluginApp, PluginMetadata, PluginError, PluginSystemConfig, PluginCapabilities};
+use super::{PluginApp, PluginMetadata, PluginError, PluginSystemConfig, PluginCapabilitiesFlags};
 
 /// Dynamic plugin loader with security validation and dependency resolution
 /// 
@@ -59,9 +59,9 @@ impl PluginLoader {
         let plugin_app = self.create_plugin_instance(&library)?;
         
         // Cache metadata
-        self.metadata_cache.insert(metadata.id.clone(), metadata.clone());
+        self.metadata_cache.insert(metadata.id.as_str().to_string(), metadata.clone());
         
-        info!("✅ Successfully loaded plugin: {} v{}", metadata.name, metadata.version);
+        info!("✅ Successfully loaded plugin: {} v{}", metadata.name.as_str(), metadata.version.as_str());
         Ok((plugin_app, metadata))
     }
     
@@ -153,17 +153,17 @@ impl PluginLoader {
     /// Validate plugin compatibility with current system
     fn validate_plugin_compatibility(&self, metadata: &PluginMetadata) -> Result<()> {
         // Check minimum engine version
-        if !self.is_version_compatible(&metadata.minimum_engine_version, env!("CARGO_PKG_VERSION")) {
+        if !self.is_version_compatible(metadata.minimum_engine_version.as_str(), env!("CARGO_PKG_VERSION")) {
             return Err(PluginError::IncompatibleVersion(
                 format!("Plugin requires engine version {} or higher, current: {}", 
-                        metadata.minimum_engine_version, env!("CARGO_PKG_VERSION"))
+                        metadata.minimum_engine_version.as_str(), env!("CARGO_PKG_VERSION"))
             ).into());
         }
         
         // Check if plugin ID conflicts with existing plugins
-        if self.metadata_cache.contains_key(&metadata.id) {
+        if self.metadata_cache.contains_key(metadata.id.as_str()) {
             return Err(PluginError::LoadFailed(
-                format!("Plugin ID '{}' already exists", metadata.id)
+                format!("Plugin ID '{}' already exists", metadata.id.as_str())
             ).into());
         }
         
@@ -207,14 +207,14 @@ impl PluginLoader {
 #[allow(dead_code)]
 pub struct SecurityValidator {
     config: PluginSystemConfig,
-    allowed_capabilities: PluginCapabilities,
+    allowed_capabilities: PluginCapabilitiesFlags,
 }
 
 impl SecurityValidator {
     fn new(config: &PluginSystemConfig) -> Self {
         Self {
             config: config.clone(),
-            allowed_capabilities: config.allowed_capabilities.clone(),
+            allowed_capabilities: config.allowed_capabilities,
         }
     }
     
@@ -257,20 +257,23 @@ impl SecurityValidator {
     }
     
     /// Validate plugin capabilities against security policy
-    fn validate_capabilities(&self, capabilities: &PluginCapabilities) -> Result<()> {
-        if capabilities.requires_network_access && !self.allowed_capabilities.requires_network_access {
+    fn validate_capabilities(&self, capabilities: &PluginCapabilitiesFlags) -> Result<()> {
+        if capabilities.has_flag(PluginCapabilitiesFlags::REQUIRES_NETWORK_ACCESS) && 
+           !self.allowed_capabilities.has_flag(PluginCapabilitiesFlags::REQUIRES_NETWORK_ACCESS) {
             return Err(PluginError::LoadFailed(
                 "Network access not permitted by security policy".to_string()
             ).into());
         }
         
-        if capabilities.supports_file_system && !self.allowed_capabilities.supports_file_system {
+        if capabilities.has_flag(PluginCapabilitiesFlags::SUPPORTS_FILE_SYSTEM) && 
+           !self.allowed_capabilities.has_flag(PluginCapabilitiesFlags::SUPPORTS_FILE_SYSTEM) {
             return Err(PluginError::LoadFailed(
                 "File system access not permitted by security policy".to_string()
             ).into());
         }
         
-        if capabilities.supports_compute_shaders && !self.allowed_capabilities.supports_compute_shaders {
+        if capabilities.has_flag(PluginCapabilitiesFlags::SUPPORTS_COMPUTE_SHADERS) && 
+           !self.allowed_capabilities.has_flag(PluginCapabilitiesFlags::SUPPORTS_COMPUTE_SHADERS) {
             return Err(PluginError::LoadFailed(
                 "Compute shader access not permitted by security policy".to_string()
             ).into());
@@ -296,7 +299,7 @@ impl SecurityValidator {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PluginManifest {
     pub plugin: PluginInfo,
-    pub capabilities: Option<PluginCapabilities>,
+    pub capabilities: Option<PluginCapabilitiesFlags>,
     pub dependencies: Option<Vec<String>>,
     pub resources: Option<ResourceRequirements>,
 }

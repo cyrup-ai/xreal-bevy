@@ -5,7 +5,7 @@
 //! zero-cost abstractions with no runtime overhead.
 
 use core::marker::PhantomData;
-use crate::plugins::{PluginCapabilities, PluginMetadata, SurfaceRequirements};
+use crate::plugins::{PluginCapabilities, PluginCapabilitiesFlags, PluginMetadata, SurfaceRequirements};
 use super::fast_data::{
     PluginId, PluginName, PluginDescription, PluginAuthor, PluginVersion,
     PluginDependencies, SmallString, FixedVec,
@@ -70,17 +70,23 @@ impl FastPluginBuilder<false, false, { caps::NONE }> {
     #[inline(always)]
     pub const fn new() -> Self {
         Self {
-            id: SmallString::from_static(""),
-            name: SmallString::from_static(""),
-            version: SmallString::from_static("1.0.0"),
-            description: SmallString::from_static(""),
-            author: SmallString::from_static(""),
+            id: SmallString::new(),
+            name: SmallString::new(),
+            version: match SmallString::from_static("1.0.0") {
+                Ok(s) => s,
+                Err(_) => SmallString::new(),
+            },
+            description: SmallString::new(),
+            author: SmallString::new(),
             dependencies: FixedVec::new(),
             surface_width: 1920,
             surface_height: 1080,
             surface_format: 0, // TextureFormat::Bgra8UnormSrgb
             preferred_update_rate: 60,
-            minimum_engine_version: SmallString::from_static("1.0.0"),
+            minimum_engine_version: match SmallString::from_static("1.0.0") {
+                Ok(s) => s,
+                Err(_) => SmallString::new(),
+            },
             _phantom: PhantomData,
         }
     }
@@ -103,7 +109,10 @@ impl<const HAS_NAME: bool, const HAS_CAPS: u8>
     #[inline(always)]
     pub const fn id(self, id: &'static str) -> FastPluginBuilder<true, HAS_NAME, HAS_CAPS> {
         FastPluginBuilder {
-            id: SmallString::from_static(id),
+            id: match SmallString::from_static(id) {
+                Ok(s) => s,
+                Err(_) => SmallString::new(),
+            },
             name: self.name,
             version: self.version,
             description: self.description,
@@ -134,7 +143,10 @@ impl<const HAS_CAPS: u8> FastPluginBuilder<true, false, HAS_CAPS> {
     pub const fn name(self, name: &'static str) -> FastPluginBuilder<true, true, HAS_CAPS> {
         FastPluginBuilder {
             id: self.id,
-            name: SmallString::from_static(name),
+            name: match SmallString::from_static(name) {
+                Ok(s) => s,
+                Err(_) => SmallString::new(),
+            },
             version: self.version,
             description: self.description,
             author: self.author,
@@ -159,8 +171,21 @@ impl<const HAS_ID: bool, const HAS_NAME: bool, const HAS_CAPS: u8>
     #[inline(always)]
     pub const fn version(self, version: &'static str) -> Self {
         Self {
-            version: SmallString::from_static(version),
-            ..self
+            version: match SmallString::from_static(version) {
+                Ok(s) => s,
+                Err(_) => SmallString::new(),
+            },
+            id: self.id,
+            name: self.name,
+            description: self.description,
+            author: self.author,
+            dependencies: self.dependencies,
+            surface_width: self.surface_width,
+            surface_height: self.surface_height,
+            surface_format: self.surface_format,
+            preferred_update_rate: self.preferred_update_rate,
+            minimum_engine_version: self.minimum_engine_version,
+            _phantom: self._phantom,
         }
     }
     
@@ -168,8 +193,21 @@ impl<const HAS_ID: bool, const HAS_NAME: bool, const HAS_CAPS: u8>
     #[inline(always)]
     pub const fn description(self, description: &'static str) -> Self {
         Self {
-            description: SmallString::from_static(description),
-            ..self
+            description: match SmallString::from_static(description) {
+                Ok(s) => s,
+                Err(_) => SmallString::new(),
+            },
+            id: self.id,
+            name: self.name,
+            version: self.version,
+            author: self.author,
+            dependencies: self.dependencies,
+            surface_width: self.surface_width,
+            surface_height: self.surface_height,
+            surface_format: self.surface_format,
+            preferred_update_rate: self.preferred_update_rate,
+            minimum_engine_version: self.minimum_engine_version,
+            _phantom: self._phantom,
         }
     }
     
@@ -177,8 +215,21 @@ impl<const HAS_ID: bool, const HAS_NAME: bool, const HAS_CAPS: u8>
     #[inline(always)]
     pub const fn author(self, author: &'static str) -> Self {
         Self {
-            author: SmallString::from_static(author),
-            ..self
+            author: match SmallString::from_static(author) {
+                Ok(s) => s,
+                Err(_) => SmallString::new(),
+            },
+            id: self.id,
+            name: self.name,
+            version: self.version,
+            description: self.description,
+            dependencies: self.dependencies,
+            surface_width: self.surface_width,
+            surface_height: self.surface_height,
+            surface_format: self.surface_format,
+            preferred_update_rate: self.preferred_update_rate,
+            minimum_engine_version: self.minimum_engine_version,
+            _phantom: self._phantom,
         }
     }
     
@@ -205,8 +256,21 @@ impl<const HAS_ID: bool, const HAS_NAME: bool, const HAS_CAPS: u8>
     #[inline(always)]
     pub const fn requires_engine(self, version: &'static str) -> Self {
         Self {
-            minimum_engine_version: SmallString::from_static(version),
-            ..self
+            minimum_engine_version: match SmallString::from_static(version) {
+                Ok(s) => s,
+                Err(_) => SmallString::new(),
+            },
+            id: self.id,
+            name: self.name,
+            version: self.version,
+            description: self.description,
+            author: self.author,
+            dependencies: self.dependencies,
+            surface_width: self.surface_width,
+            surface_height: self.surface_height,
+            surface_format: self.surface_format,
+            preferred_update_rate: self.preferred_update_rate,
+            _phantom: self._phantom,
         }
     }
 }
@@ -214,6 +278,7 @@ impl<const HAS_ID: bool, const HAS_NAME: bool, const HAS_CAPS: u8>
 /// Capability configuration methods (only available when ID and name are set)
 impl<const HAS_CAPS: u8> FastPluginBuilder<true, true, HAS_CAPS> {
     /// Enable transparency support
+    #[allow(dead_code)]
     #[inline(always)]
     pub const fn supports_transparency(self) -> FastPluginBuilder<true, true, 255> {
         FastPluginBuilder {
@@ -271,6 +336,7 @@ impl<const HAS_CAPS: u8> FastPluginBuilder<true, true, HAS_CAPS> {
     }
     
     /// Enable 3D rendering
+    #[allow(dead_code)]
     #[inline(always)]
     pub const fn supports_3d_rendering(self) -> FastPluginBuilder<true, true, 255> {
         FastPluginBuilder {
@@ -290,6 +356,7 @@ impl<const HAS_CAPS: u8> FastPluginBuilder<true, true, HAS_CAPS> {
     }
     
     /// Enable compute shaders
+    #[allow(dead_code)]
     #[inline(always)]
     pub const fn supports_compute_shaders(self) -> FastPluginBuilder<true, true, 255> {
         FastPluginBuilder {
@@ -380,31 +447,50 @@ impl<const HAS_CAPS: u8> FastPluginBuilder<true, true, HAS_CAPS> {
     #[inline]
     pub fn build(self) -> PluginMetadata {
         // Convert compile-time capability bits to runtime capabilities
-        let capabilities = PluginCapabilities {
-            supports_transparency: (HAS_CAPS & caps::TRANSPARENCY) != 0,
-            requires_keyboard_focus: (HAS_CAPS & caps::KEYBOARD) != 0,
-            supports_multi_window: (HAS_CAPS & caps::MULTI_WINDOW) != 0,
-            supports_3d_rendering: (HAS_CAPS & caps::RENDERING_3D) != 0,
-            supports_compute_shaders: (HAS_CAPS & caps::COMPUTE_SHADERS) != 0,
-            requires_network_access: (HAS_CAPS & caps::NETWORK) != 0,
-            supports_file_system: (HAS_CAPS & caps::FILE_SYSTEM) != 0,
-            supports_audio: (HAS_CAPS & caps::AUDIO) != 0,
-            preferred_update_rate: if self.preferred_update_rate > 0 {
-                Some(self.preferred_update_rate)
-            } else {
-                None
-            },
-        };
+        let mut capabilities = PluginCapabilitiesFlags::new();
+        
+        if (HAS_CAPS & caps::TRANSPARENCY) != 0 {
+            capabilities.set_flag(PluginCapabilitiesFlags::SUPPORTS_TRANSPARENCY);
+        }
+        if (HAS_CAPS & caps::KEYBOARD) != 0 {
+            capabilities.set_flag(PluginCapabilitiesFlags::REQUIRES_KEYBOARD_FOCUS);
+        }
+        if (HAS_CAPS & caps::MULTI_WINDOW) != 0 {
+            capabilities.set_flag(PluginCapabilitiesFlags::SUPPORTS_MULTI_WINDOW);
+        }
+        if (HAS_CAPS & caps::RENDERING_3D) != 0 {
+            capabilities.set_flag(PluginCapabilitiesFlags::SUPPORTS_3D_RENDERING);
+        }
+        if (HAS_CAPS & caps::COMPUTE_SHADERS) != 0 {
+            capabilities.set_flag(PluginCapabilitiesFlags::SUPPORTS_COMPUTE_SHADERS);
+        }
+        if (HAS_CAPS & caps::NETWORK) != 0 {
+            capabilities.set_flag(PluginCapabilitiesFlags::REQUIRES_NETWORK_ACCESS);
+        }
+        if (HAS_CAPS & caps::FILE_SYSTEM) != 0 {
+            capabilities.set_flag(PluginCapabilitiesFlags::SUPPORTS_FILE_SYSTEM);
+        }
+        if (HAS_CAPS & caps::AUDIO) != 0 {
+            capabilities.set_flag(PluginCapabilitiesFlags::SUPPORTS_AUDIO);
+        }
         
         PluginMetadata {
-            id: self.id.as_str().to_string(),
-            name: self.name.as_str().to_string(),
-            version: self.version.as_str().to_string(),
-            description: self.description.as_str().to_string(),
-            author: self.author.as_str().to_string(),
+            id: self.id,
+            name: self.name,
+            version: self.version,
+            description: self.description,
+            author: self.author,
             capabilities,
-            dependencies: self.dependencies.iter_any().map(|d| d.as_str().to_string()).collect(),
-            minimum_engine_version: self.minimum_engine_version.as_str().to_string(),
+            dependencies: {
+                let mut deps = PluginDependencies::new();
+                for dep in self.dependencies.iter_any() {
+                    if !deps.push(*dep) {
+                        break;
+                    }
+                }
+                deps
+            },
+            minimum_engine_version: self.minimum_engine_version,
             icon_path: None, // Can be added as needed
             library_path: std::path::PathBuf::new(),
         }
@@ -434,6 +520,7 @@ impl<const HAS_CAPS: u8> FastPluginBuilder<true, true, HAS_CAPS> {
     }
     
     /// Get surface requirements
+    #[allow(dead_code)]
     #[inline]
     pub fn surface_requirements(self) -> SurfaceRequirements {
         SurfaceRequirements {
@@ -503,6 +590,7 @@ macro_rules! fast_plugin {
 }
 
 /// Type alias for the initial builder state
+#[allow(dead_code)]
 pub type NewPluginBuilder = FastPluginBuilder<false, false, { caps::NONE }>;
 
 // Re-export commented out until needed

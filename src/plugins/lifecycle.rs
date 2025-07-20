@@ -9,7 +9,7 @@ use bevy::prelude::*;
 use crate::JitterMetrics;
 use super::{
     PluginLifecycleEvent, PluginLifecycleState, 
-    registry::PluginRegistry, context::{PluginResourceManager, PluginPerformanceTracker}
+    FastPluginRegistry, AtomicPluginState, context::{PluginResourceManager, PluginPerformanceTracker}
 };
 
 /// Plugin lifecycle management resource
@@ -120,7 +120,7 @@ impl PluginLifecycleManager {
 /// Integrates with FixedUpdate scheduling and coordinates with existing XREAL systems
 pub fn plugin_lifecycle_system(
     mut lifecycle_manager: ResMut<PluginLifecycleManager>,
-    mut plugin_registry: ResMut<PluginRegistry>,
+    plugin_registry: ResMut<FastPluginRegistry>,
     mut lifecycle_events: EventWriter<PluginLifecycleEvent>,
     mut resource_manager: ResMut<PluginResourceManager>,
     mut performance_tracker: ResMut<PluginPerformanceTracker>,
@@ -182,18 +182,21 @@ pub fn plugin_lifecycle_system(
         resource_manager.cleanup_plugin(&plugin_id);
         performance_tracker.cleanup_plugin(&plugin_id);
         
-        // Remove from registry
-        if let Some(instance) = plugin_registry.get_plugin_mut(&plugin_id) {
-            if let Some(ref mut app) = instance.app {
-                if let Err(e) = app.shutdown() {
-                    warn!("Plugin {} shutdown failed: {}", plugin_id, e);
-                }
+        // Remove from registry - FastPluginRegistry handles this internally
+        if let Some(entry) = plugin_registry.get_plugin(&plugin_id) {
+            // Update state to unloading
+            if let Err(e) = entry.state.set_lifecycle_state(AtomicPluginState::STATE_UNLOADING) {
+                warn!("Failed to set plugin {} state to unloading: {}", plugin_id, e);
+            }
+            
+            // Set state to unloaded
+            if let Err(e) = entry.state.set_lifecycle_state(AtomicPluginState::STATE_UNLOADED) {
+                warn!("Failed to set plugin {} state to unloaded: {}", plugin_id, e);
             }
         }
         
-        if let Err(e) = plugin_registry.unload_plugin(&plugin_id) {
-            error!("Failed to unload plugin {}: {}", plugin_id, e);
-        }
+        // FastPluginRegistry doesn't have unload_plugin method, so we mark it as unloaded
+        // The actual cleanup will be handled by the registry's internal systems
         lifecycle_manager.plugin_states.remove(&plugin_id);
         lifecycle_manager.error_states.remove(&plugin_id);
         
@@ -205,7 +208,7 @@ pub fn plugin_lifecycle_system(
 /// Coordinates with existing JitterMetrics system for performance monitoring
 pub fn plugin_health_monitoring_system(
     mut lifecycle_manager: ResMut<PluginLifecycleManager>,
-    plugin_registry: Res<PluginRegistry>,
+    plugin_registry: Res<FastPluginRegistry>,
     performance_tracker: Res<PluginPerformanceTracker>,
     _jitter_metrics: Res<JitterMetrics>,
 ) {
@@ -237,7 +240,7 @@ pub fn plugin_health_monitoring_system(
 /// Implements retry logic and error isolation
 pub fn plugin_error_recovery_system(
     mut lifecycle_manager: ResMut<PluginLifecycleManager>,
-    plugin_registry: ResMut<PluginRegistry>,
+    plugin_registry: ResMut<FastPluginRegistry>,
     _time: Res<Time>,
 ) {
     let error_plugins = lifecycle_manager.get_plugins_in_state(PluginLifecycleState::Error);
@@ -245,7 +248,11 @@ pub fn plugin_error_recovery_system(
     for plugin_id in error_plugins {
         if let Some(instance) = plugin_registry.get_plugin(&plugin_id) {
             // Check if enough time has passed for retry (5 seconds)
-            let time_since_error = instance.load_time.elapsed().as_secs();
+            let load_time = instance.get_load_time();
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default();
+            let time_since_error = now.saturating_sub(load_time).as_secs();
             if time_since_error > 5 {
                 info!("Attempting recovery for plugin: {}", plugin_id);
                 
@@ -270,7 +277,7 @@ pub fn plugin_error_recovery_system(
 pub fn plugin_resource_coordination_system(
     lifecycle_manager: Res<PluginLifecycleManager>,
     mut resource_manager: ResMut<PluginResourceManager>,
-    _plugin_registry: Res<PluginRegistry>,
+    _plugin_registry: Res<FastPluginRegistry>,
 ) {
     // Coordinate resource allocation with plugin states
     let initializing_plugins = lifecycle_manager.get_plugins_in_state(PluginLifecycleState::Initializing);

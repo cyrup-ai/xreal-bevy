@@ -7,6 +7,7 @@
 use bevy::prelude::*;
 use std::marker::PhantomData;
 use std::path::PathBuf;
+use super::PluginCapabilitiesFlags;
 
 use super::{PluginCapabilities, PluginMetadata, SurfaceRequirements};
 
@@ -850,15 +851,26 @@ impl SimplePluginBuilder {
     
     /// Build metadata
     pub fn build(self) -> PluginMetadata {
+        use super::fast_data::PluginDependencies;
+        
+        // Convert dependencies Vec<String> to PluginDependencies
+        let mut ultra_deps = PluginDependencies::new();
+        for dep in self.dependencies {
+            if !ultra_deps.push(super::fast_data::create_plugin_id(&dep)) {
+                warn!("Dependency list full, skipping: {}", dep);
+                break;
+            }
+        }
+        
         PluginMetadata {
-            id: self.id.unwrap_or_else(|| "unknown.plugin".to_string()),
-            name: self.name.unwrap_or_else(|| "Unknown Plugin".to_string()),
-            version: self.version,
-            description: self.description,
-            author: self.author,
-            capabilities: self.capabilities,
-            dependencies: self.dependencies,
-            minimum_engine_version: self.minimum_engine_version,
+            id: super::fast_data::create_plugin_id(&self.id.unwrap_or_else(|| "unknown.plugin".to_string())),
+            name: super::fast_data::create_plugin_name(&self.name.unwrap_or_else(|| "Unknown Plugin".to_string())),
+            version: super::fast_data::create_plugin_version(&self.version),
+            description: super::fast_data::create_plugin_description(&self.description),
+            author: super::fast_data::create_plugin_author(&self.author),
+            capabilities: convert_capabilities_to_flags(&self.capabilities),
+            dependencies: ultra_deps,
+            minimum_engine_version: super::fast_data::create_plugin_version(&self.minimum_engine_version),
             icon_path: self.icon_path,
             library_path: PathBuf::new(),
         }
@@ -884,15 +896,26 @@ impl PluginBuilder<state::HasId, state::HasName, state::HasCapabilities, state::
     ///     .build();
     /// ```
     pub fn build(self) -> PluginMetadata {
+        use super::fast_data::PluginDependencies;
+        
+        // Convert dependencies Vec<String> to PluginDependencies
+        let mut ultra_deps = PluginDependencies::new();
+        for dep in self.dependencies {
+            if !ultra_deps.push(super::fast_data::create_plugin_id(&dep)) {
+                warn!("Dependency list full, skipping: {}", dep);
+                break;
+            }
+        }
+        
         PluginMetadata {
-            id: self.id.expect("ID should be set in HasId state"),
-            name: self.name.expect("Name should be set in HasName state"),
-            version: self.version,
-            description: self.description,
-            author: self.author,
-            capabilities: self.capabilities.expect("Capabilities should be set in HasCapabilities state"),
-            dependencies: self.dependencies,
-            minimum_engine_version: self.minimum_engine_version,
+            id: super::fast_data::create_plugin_id(&self.id.expect("ID should be set in HasId state")),
+            name: super::fast_data::create_plugin_name(&self.name.expect("Name should be set in HasName state")),
+            version: super::fast_data::create_plugin_version(&self.version),
+            description: super::fast_data::create_plugin_description(&self.description),
+            author: super::fast_data::create_plugin_author(&self.author),
+            capabilities: convert_capabilities_to_flags(&self.capabilities.unwrap_or_default()),
+            dependencies: ultra_deps,
+            minimum_engine_version: super::fast_data::create_plugin_version(&self.minimum_engine_version),
             icon_path: self.icon_path,
             library_path: PathBuf::new(), // Set by the plugin loader
         }
@@ -1061,4 +1084,36 @@ mod tests {
     //         .supports_transparency()
     //         .build(); // This should fail to compile
     // }
+}
+
+/// Convert old PluginCapabilities to new PluginCapabilitiesFlags
+fn convert_capabilities_to_flags(capabilities: &PluginCapabilities) -> PluginCapabilitiesFlags {
+    let mut flags = PluginCapabilitiesFlags::new();
+    
+    if capabilities.supports_transparency {
+        flags.set_flag(PluginCapabilitiesFlags::SUPPORTS_TRANSPARENCY);
+    }
+    if capabilities.requires_keyboard_focus {
+        flags.set_flag(PluginCapabilitiesFlags::REQUIRES_KEYBOARD_FOCUS);
+    }
+    if capabilities.supports_multi_window {
+        flags.set_flag(PluginCapabilitiesFlags::SUPPORTS_MULTI_WINDOW);
+    }
+    if capabilities.supports_3d_rendering {
+        flags.set_flag(PluginCapabilitiesFlags::SUPPORTS_3D_RENDERING);
+    }
+    if capabilities.supports_compute_shaders {
+        flags.set_flag(PluginCapabilitiesFlags::SUPPORTS_COMPUTE_SHADERS);
+    }
+    if capabilities.requires_network_access {
+        flags.set_flag(PluginCapabilitiesFlags::REQUIRES_NETWORK_ACCESS);
+    }
+    if capabilities.supports_file_system {
+        flags.set_flag(PluginCapabilitiesFlags::SUPPORTS_FILE_SYSTEM);
+    }
+    if capabilities.supports_audio {
+        flags.set_flag(PluginCapabilitiesFlags::SUPPORTS_AUDIO);
+    }
+    
+    flags
 }
