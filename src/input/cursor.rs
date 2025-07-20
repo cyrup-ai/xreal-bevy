@@ -26,7 +26,7 @@ impl CursorState {
             is_dwelling: false,
         }
     }
-    
+
     /// Update the cursor state with the time since the last update
     pub fn update(&mut self, delta_seconds: f32) {
         if self.is_dwelling {
@@ -35,22 +35,22 @@ impl CursorState {
             self.dwell_time = 0.0;
         }
     }
-    
+
     /// Check if the dwell time has been reached
     pub fn is_dwell_complete(&self) -> bool {
         self.dwell_time >= self.dwell_threshold
     }
-    
+
     /// Reset the dwell timer
     pub fn reset_dwell(&mut self) {
         self.dwell_time = 0.0;
     }
-    
+
     /// Start the dwell timer
     pub fn start_dwell(&mut self) {
         self.is_dwelling = true;
     }
-    
+
     /// Stop the dwell timer
     pub fn stop_dwell(&mut self) {
         self.is_dwelling = false;

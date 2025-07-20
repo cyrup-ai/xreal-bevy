@@ -1,19 +1,19 @@
 //! Plugin Context and Render Context Structures
-//! 
+//!
 //! Provides context structures that give plugins safe access to WGPU resources,
 //! following Bevy's render world patterns. Integrates with existing src/main.rs
 //! render systems and maintains jitter-free performance.
 //!
 //! Reference: XREAL_GUIDE.md Resource Integration Plugin (lines 249-293)
 
+use crate::tracking::Orientation;
 use anyhow::Result;
 use bevy::prelude::*;
 use bevy::render::renderer::{RenderDevice, RenderQueue};
-use crate::tracking::Orientation;
 
 /// Plugin context providing safe access to WGPU resources
-/// 
-/// Follows XRealStereoTextures pattern from XREAL_GUIDE.md and integrates 
+///
+/// Follows XRealStereoTextures pattern from XREAL_GUIDE.md and integrates
 /// with existing JitterMetrics system.
 #[derive(Resource, Clone)]
 pub struct PluginContext {
@@ -93,10 +93,10 @@ pub struct RenderContext<'a> {
 
 impl<'a> RenderContext<'a> {
     /// Check if there's sufficient frame budget remaining
-    /// 
+    ///
     /// Returns true if the plugin can proceed with rendering based on available
     /// frame time budget. This helps maintain consistent frame rates.
-    /// 
+    ///
     /// # Returns
     /// * `bool` - True if budget is available for rendering
     #[inline]
@@ -104,9 +104,9 @@ impl<'a> RenderContext<'a> {
     pub fn has_frame_budget(&self) -> bool {
         self.budget_consumed_ms < self.frame_budget_ms
     }
-    
+
     /// Get remaining frame budget in milliseconds
-    /// 
+    ///
     /// # Returns
     /// * `f32` - Remaining budget in milliseconds
     #[inline]
@@ -114,9 +114,9 @@ impl<'a> RenderContext<'a> {
     pub fn remaining_budget_ms(&self) -> f32 {
         (self.frame_budget_ms - self.budget_consumed_ms).max(0.0)
     }
-    
+
     /// Get budget utilization percentage
-    /// 
+    ///
     /// # Returns
     /// * `f32` - Budget used as percentage (0.0 to 1.0+)
     #[inline]
@@ -128,41 +128,44 @@ impl<'a> RenderContext<'a> {
             0.0
         }
     }
-    
+
     /// Consume frame budget time
-    /// 
+    ///
     /// Records time spent on rendering operations to track budget consumption.
     /// Should be called after completing rendering work.
-    /// 
+    ///
     /// # Arguments
     /// * `time_ms` - Time consumed in milliseconds
     #[inline]
     #[allow(dead_code)] // Used by plugin examples through trait objects
     pub fn consume_budget(&mut self, time_ms: f32) {
         self.budget_consumed_ms += time_ms;
-        
+
         // Record performance metrics
         self.performance_metrics.frame_render_time = time_ms;
-        
+
         // Warn if budget exceeded
         if self.budget_consumed_ms > self.frame_budget_ms {
             let overage = self.budget_consumed_ms - self.frame_budget_ms;
-            warn!("Plugin frame budget exceeded by {:.2}ms ({:.1}%)", 
-                  overage, (overage / self.frame_budget_ms) * 100.0);
+            warn!(
+                "Plugin frame budget exceeded by {:.2}ms ({:.1}%)",
+                overage,
+                (overage / self.frame_budget_ms) * 100.0
+            );
         }
     }
-    
+
     /// Reset budget consumption for new frame
-    /// 
+    ///
     /// Should be called at the start of each frame cycle.
     #[inline]
     #[allow(dead_code)] // Used by plugin examples through trait objects
     pub fn reset_budget(&mut self) {
         self.budget_consumed_ms = 0.0;
     }
-    
+
     /// Check if plugin is within performance thresholds
-    /// 
+    ///
     /// # Returns
     /// * `bool` - True if performance is acceptable
     #[inline]
@@ -220,36 +223,36 @@ impl PluginResourceManager {
             resource_limits: limits,
         }
     }
-    
+
     /// Check if plugin resource allocation is within limits
     pub fn can_allocate(&self, memory_mb: u64) -> bool {
-        self.total_memory_usage + memory_mb <= self.resource_limits.max_total_memory_mb &&
-        memory_mb <= self.resource_limits.max_plugin_memory_mb
+        self.total_memory_usage + memory_mb <= self.resource_limits.max_total_memory_mb
+            && memory_mb <= self.resource_limits.max_plugin_memory_mb
     }
-    
+
     /// Register plugin resource usage
     pub fn register_plugin(&mut self, memory_mb: u64) -> Result<()> {
         if !self.can_allocate(memory_mb) {
             return Err(anyhow::anyhow!("Plugin memory allocation exceeds limits"));
         }
-        
+
         self.total_memory_usage += memory_mb;
         self.active_plugins += 1;
         Ok(())
     }
-    
+
     /// Unregister plugin and free resources
     pub fn unregister_plugin(&mut self, memory_mb: u64) {
         self.total_memory_usage = self.total_memory_usage.saturating_sub(memory_mb);
         self.active_plugins = self.active_plugins.saturating_sub(1);
     }
-    
+
     /// Cleanup plugin resources
     pub fn cleanup_plugin(&mut self, plugin_id: &str) {
         // In full implementation, this would track per-plugin resource usage
         debug!("Cleaning up resources for plugin: {}", plugin_id);
     }
-    
+
     /// Get current memory usage
     pub fn get_memory_usage(&self) -> u64 {
         self.total_memory_usage
@@ -293,51 +296,56 @@ impl PluginPerformanceTracker {
             violations: 0,
         }
     }
-    
+
     /// Record frame timing for jitter analysis
     pub fn record_frame_time(&mut self, time_ms: f32) {
         self.frame_times.push(time_ms);
-        
+
         // Keep buffer size manageable
         if self.frame_times.len() > 1000 {
             self.frame_times.remove(0);
         }
-        
+
         // Check for violations
         if time_ms > self.thresholds.max_frame_time_ms {
             self.violations += 1;
-            warn!("Plugin frame time violation: {:.2}ms > {:.2}ms threshold", 
-                  time_ms, self.thresholds.max_frame_time_ms);
+            warn!(
+                "Plugin frame time violation: {:.2}ms > {:.2}ms threshold",
+                time_ms, self.thresholds.max_frame_time_ms
+            );
         }
     }
-    
+
     /// Calculate current jitter level
     pub fn calculate_jitter(&self) -> f32 {
         if self.frame_times.len() < 2 {
             return 0.0;
         }
-        
+
         let mean = self.frame_times.iter().sum::<f32>() / self.frame_times.len() as f32;
-        let variance = self.frame_times.iter()
+        let variance = self
+            .frame_times
+            .iter()
             .map(|&x| (x - mean).powi(2))
-            .sum::<f32>() / self.frame_times.len() as f32;
-        
+            .sum::<f32>()
+            / self.frame_times.len() as f32;
+
         variance.sqrt()
     }
-    
+
     /// Cleanup plugin performance tracking
     pub fn cleanup_plugin(&mut self, plugin_id: &str) {
         // In full implementation, this would clean up per-plugin metrics
         debug!("Cleaning up performance tracking for plugin: {}", plugin_id);
     }
-    
+
     /// Check if plugin is performing well
     pub fn is_plugin_performing_well(&self, _plugin_id: &str) -> bool {
         // In full implementation, this would check per-plugin metrics
         let current_jitter = self.calculate_jitter();
         current_jitter < self.thresholds.jitter_threshold_ms
     }
-    
+
     /// Get average frame time across all plugins
     pub fn get_average_frame_time(&self) -> f32 {
         if self.frame_times.is_empty() {
@@ -345,7 +353,7 @@ impl PluginPerformanceTracker {
         }
         self.frame_times.iter().sum::<f32>() / self.frame_times.len() as f32
     }
-    
+
     /// Record frame time for specific plugin
     pub fn record_frame_time_for_plugin(&mut self, _plugin_id: String, time_ms: f32) {
         // For now, record globally - in full implementation, track per-plugin
@@ -354,10 +362,7 @@ impl PluginPerformanceTracker {
 }
 
 /// System to update plugin contexts with current XREAL state
-pub fn update_plugin_contexts_system(
-    _orientation: Res<Orientation>,
-    _time: Res<Time>,
-) {
+pub fn update_plugin_contexts_system(_orientation: Res<Orientation>, _time: Res<Time>) {
     // Update plugin contexts with latest XREAL data
     // Implementation will be added as plugin system develops
 }
@@ -369,7 +374,7 @@ pub fn plugin_resource_monitoring_system(
     time: Res<Time>,
 ) {
     let frame_time_ms = time.delta_secs() * 1000.0;
-    
+
     // Monitor plugin performance integration with existing jitter measurement
     if frame_time_ms > 16.0 {
         debug!("Frame time above 60fps budget: {:.2}ms", frame_time_ms);

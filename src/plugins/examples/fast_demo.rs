@@ -1,17 +1,14 @@
 //! Ultra-Fast Plugin Builder Demonstrations
-//! 
+//!
 //! This module showcases the blazing-fast, zero-allocation plugin builder
 //! system with comprehensive examples of type-safe, compile-time validated
 //! plugin configurations. All examples are optimized for maximum performance.
 
-use crate::plugins::{
-    fast_builder::FastPluginBuilder,
-    PluginMetadata, PluginCapabilitiesFlags,
-};
 use crate::fast_plugin;
+use crate::plugins::{fast_builder::FastPluginBuilder, PluginCapabilitiesFlags, PluginMetadata};
 
 /// Ultra-fast browser plugin creation
-/// 
+///
 /// Demonstrates zero-allocation plugin metadata creation using compile-time
 /// constants and type-safe builder patterns. All validation happens at
 /// compile time with zero runtime overhead.
@@ -22,7 +19,7 @@ pub const fn create_ultra_fast_browser() -> &'static str {
 }
 
 /// Compile-time browser plugin metadata
-/// 
+///
 /// Uses const generics and zero-allocation string storage for maximum
 /// performance. All metadata is embedded directly in the binary.
 pub fn get_browser_metadata() -> PluginMetadata {
@@ -67,7 +64,7 @@ pub fn get_terminal_metadata() -> PluginMetadata {
     FastPluginBuilder::new()
         .id("com.xreal.terminal.pro")
         .name("XREAL Terminal Pro")
-        .version("1.5.0") 
+        .version("1.5.0")
         .description("Professional terminal with zero-allocation command processing")
         .author("XREAL Systems Team")
         .requires_engine("1.5.0")
@@ -99,27 +96,24 @@ pub fn get_media_player_metadata() -> PluginMetadata {
 }
 
 /// Demonstration of macro-based plugin creation
-/// 
+///
 /// Shows how the fast_plugin! macro generates optimized plugin
 /// configurations at compile time.
 pub fn demonstrate_macros() -> Vec<PluginMetadata> {
     vec![
         // Browser-like plugin
         fast_plugin!(browser: "macro.browser", "Macro Browser").build(),
-        
         // Terminal-like plugin
         fast_plugin!(terminal: "macro.terminal", "Macro Terminal").build(),
-        
         // Game-like plugin
         fast_plugin!(game: "macro.game", "Macro Game").build(),
-        
         // Basic plugin
         fast_plugin!(basic: "macro.basic", "Macro Basic").build(),
     ]
 }
 
 /// Performance comparison demonstration
-/// 
+///
 /// Shows the performance characteristics of different plugin
 /// configurations and their impact on system resources.
 pub struct PluginPerformanceDemo {
@@ -145,7 +139,6 @@ impl PluginPerformanceDemo {
                     .supports_audio()
                     .update_rate(120)
                     .build(),
-                    
                 FastPluginBuilder::new()
                     .id("perf.media.4k")
                     .name("4K Media Player")
@@ -155,7 +148,7 @@ impl PluginPerformanceDemo {
                     .update_rate(120)
                     .build(),
             ],
-            
+
             balanced_plugins: vec![
                 // Standard productivity plugins
                 FastPluginBuilder::new()
@@ -166,7 +159,6 @@ impl PluginPerformanceDemo {
                     .supports_audio()
                     .update_rate(60)
                     .build(),
-                    
                 FastPluginBuilder::new()
                     .id("perf.editor.code")
                     .name("Code Editor")
@@ -176,7 +168,7 @@ impl PluginPerformanceDemo {
                     .update_rate(60)
                     .build(),
             ],
-            
+
             low_power_plugins: vec![
                 // Energy-efficient plugins
                 FastPluginBuilder::new()
@@ -186,7 +178,6 @@ impl PluginPerformanceDemo {
                     .supports_file_system()
                     .update_rate(30)
                     .build(),
-                    
                 FastPluginBuilder::new()
                     .id("perf.reader.epub")
                     .name("E-Reader")
@@ -197,62 +188,78 @@ impl PluginPerformanceDemo {
             ],
         }
     }
-    
+
     /// Get all plugins organized by performance tier
-    pub fn get_all_plugins(&self) -> (Vec<&PluginMetadata>, Vec<&PluginMetadata>, Vec<&PluginMetadata>) {
+    pub fn get_all_plugins(
+        &self,
+    ) -> (
+        Vec<&PluginMetadata>,
+        Vec<&PluginMetadata>,
+        Vec<&PluginMetadata>,
+    ) {
         (
             self.high_perf_plugins.iter().collect(),
-            self.balanced_plugins.iter().collect(), 
+            self.balanced_plugins.iter().collect(),
             self.low_power_plugins.iter().collect(),
         )
     }
-    
+
     /// Calculate total resource requirements for each tier
     pub fn calculate_resource_requirements(&self) -> (f32, f32, f32) {
-        let high_perf_load = self.high_perf_plugins.iter()
+        let high_perf_load = self
+            .high_perf_plugins
+            .iter()
             .map(|_p| 60.0 / 60.0) // Default to 60 FPS
             .sum::<f32>();
-            
-        let balanced_load = self.balanced_plugins.iter()
+
+        let balanced_load = self
+            .balanced_plugins
+            .iter()
             .map(|_p| 60.0 / 60.0) // Default to 60 FPS
             .sum::<f32>();
-            
-        let low_power_load = self.low_power_plugins.iter()
+
+        let low_power_load = self
+            .low_power_plugins
+            .iter()
             .map(|_p| 30.0 / 60.0) // Default to 30 FPS for low power
             .sum::<f32>();
-            
+
         (high_perf_load, balanced_load, low_power_load)
     }
 }
 
 /// Zero-allocation capability analysis
-/// 
+///
 /// Demonstrates compile-time capability analysis and optimization
 /// recommendations based on plugin configurations.
 pub mod capability_analysis {
     use super::*;
-    
+
     /// Compile-time capability checker
-    /// 
+    ///
     /// Analyzes plugin capabilities at compile time to provide
     /// optimization recommendations and resource planning.
     pub struct CapabilityAnalyzer;
-    
+
     impl CapabilityAnalyzer {
         /// Analyze network requirements across plugins
         #[inline(always)]
         pub fn analyze_network_requirements(plugins: &[PluginMetadata]) -> NetworkAnalysis {
-            let network_plugins = plugins.iter()
-                .filter(|p| p.capabilities.has_flag(PluginCapabilitiesFlags::REQUIRES_NETWORK_ACCESS))
+            let network_plugins = plugins
+                .iter()
+                .filter(|p| {
+                    p.capabilities
+                        .has_flag(PluginCapabilitiesFlags::REQUIRES_NETWORK_ACCESS)
+                })
                 .count();
-                
+
             let total_plugins = plugins.len();
             let network_ratio = if total_plugins > 0 {
                 network_plugins as f32 / total_plugins as f32
             } else {
                 0.0
             };
-            
+
             NetworkAnalysis {
                 network_dependent_plugins: network_plugins,
                 total_plugins,
@@ -260,22 +267,31 @@ pub mod capability_analysis {
                 recommended_bandwidth_mbps: network_plugins as f32 * 10.0, // 10 Mbps per plugin
             }
         }
-        
+
         /// Analyze rendering workload
         #[inline(always)]
         pub fn analyze_rendering_workload(plugins: &[PluginMetadata]) -> RenderingAnalysis {
-            let rendering_3d = plugins.iter()
-                .filter(|p| p.capabilities.has_flag(PluginCapabilitiesFlags::SUPPORTS_3D_RENDERING))
+            let rendering_3d = plugins
+                .iter()
+                .filter(|p| {
+                    p.capabilities
+                        .has_flag(PluginCapabilitiesFlags::SUPPORTS_3D_RENDERING)
+                })
                 .count();
-                
-            let compute_shaders = plugins.iter()
-                .filter(|p| p.capabilities.has_flag(PluginCapabilitiesFlags::SUPPORTS_COMPUTE_SHADERS))
+
+            let compute_shaders = plugins
+                .iter()
+                .filter(|p| {
+                    p.capabilities
+                        .has_flag(PluginCapabilitiesFlags::SUPPORTS_COMPUTE_SHADERS)
+                })
                 .count();
-                
-            let total_fps_demand = plugins.iter()
+
+            let total_fps_demand = plugins
+                .iter()
                 .map(|_p| 60) // Default to 60 FPS
                 .sum::<u32>();
-                
+
             RenderingAnalysis {
                 plugins_3d: rendering_3d,
                 plugins_compute: compute_shaders,
@@ -284,14 +300,18 @@ pub mod capability_analysis {
                 recommended_gpu_memory_mb: (rendering_3d * 256 + compute_shaders * 128) as u32,
             }
         }
-        
+
         /// Analyze audio requirements
         #[inline(always)]
         pub fn analyze_audio_requirements(plugins: &[PluginMetadata]) -> AudioAnalysis {
-            let audio_plugins = plugins.iter()
-                .filter(|p| p.capabilities.has_flag(PluginCapabilitiesFlags::SUPPORTS_AUDIO))
+            let audio_plugins = plugins
+                .iter()
+                .filter(|p| {
+                    p.capabilities
+                        .has_flag(PluginCapabilitiesFlags::SUPPORTS_AUDIO)
+                })
                 .count();
-                
+
             AudioAnalysis {
                 audio_enabled_plugins: audio_plugins,
                 estimated_audio_streams: audio_plugins,
@@ -300,7 +320,7 @@ pub mod capability_analysis {
             }
         }
     }
-    
+
     /// Network usage analysis results
     #[derive(Debug, Clone)]
     pub struct NetworkAnalysis {
@@ -309,7 +329,7 @@ pub mod capability_analysis {
         pub network_dependency_ratio: f32,
         pub recommended_bandwidth_mbps: f32,
     }
-    
+
     /// Rendering workload analysis results
     #[derive(Debug, Clone)]
     pub struct RenderingAnalysis {
@@ -319,7 +339,7 @@ pub mod capability_analysis {
         pub gpu_load_estimate: f32,
         pub recommended_gpu_memory_mb: u32,
     }
-    
+
     /// Audio system analysis results
     #[derive(Debug, Clone)]
     pub struct AudioAnalysis {
@@ -331,12 +351,12 @@ pub mod capability_analysis {
 }
 
 /// Real-world plugin configuration examples
-/// 
+///
 /// Demonstrates practical plugin configurations for common use cases
 /// with optimal performance characteristics.
 pub mod real_world_examples {
     use super::*;
-    
+
     /// Professional development environment
     pub fn create_development_suite() -> Vec<PluginMetadata> {
         vec![
@@ -352,7 +372,6 @@ pub mod real_world_examples {
                 .supports_multi_window()
                 .update_rate(60)
                 .build(),
-                
             // Terminal for command-line work
             FastPluginBuilder::new()
                 .id("dev.terminal.powershell")
@@ -364,7 +383,6 @@ pub mod real_world_examples {
                 .supports_file_system()
                 .update_rate(30)
                 .build(),
-                
             // Browser for documentation and testing
             FastPluginBuilder::new()
                 .id("dev.browser.edge")
@@ -378,7 +396,6 @@ pub mod real_world_examples {
                 .supports_compute_shaders() // WebGL dev tools
                 .update_rate(60)
                 .build(),
-                
             // Git client
             FastPluginBuilder::new()
                 .id("dev.git.sourcetree")
@@ -393,7 +410,7 @@ pub mod real_world_examples {
                 .build(),
         ]
     }
-    
+
     /// Media production environment
     pub fn create_media_production_suite() -> Vec<PluginMetadata> {
         vec![
@@ -411,7 +428,6 @@ pub mod real_world_examples {
                 .supports_3d_rendering() // 3D timeline
                 .update_rate(60)
                 .build(),
-                
             // Audio editor
             FastPluginBuilder::new()
                 .id("media.audio.audition")
@@ -425,7 +441,6 @@ pub mod real_world_examples {
                 .supports_compute_shaders() // Audio processing
                 .update_rate(60)
                 .build(),
-                
             // Media browser
             FastPluginBuilder::new()
                 .id("media.browser.bridge")
@@ -440,7 +455,7 @@ pub mod real_world_examples {
                 .build(),
         ]
     }
-    
+
     /// Gaming environment
     pub fn create_gaming_suite() -> Vec<PluginMetadata> {
         vec![
@@ -458,7 +473,6 @@ pub mod real_world_examples {
                 .supports_multi_window()
                 .update_rate(120) // Maximum performance
                 .build(),
-                
             // Game launcher
             FastPluginBuilder::new()
                 .id("game.launcher.steam")
@@ -471,7 +485,6 @@ pub mod real_world_examples {
                 .supports_audio()
                 .update_rate(60)
                 .build(),
-                
             // Performance monitoring
             FastPluginBuilder::new()
                 .id("game.monitor.afterburner")
@@ -487,14 +500,14 @@ pub mod real_world_examples {
 }
 
 /// Compile-time plugin validation examples
-/// 
+///
 /// Demonstrates how the type system prevents invalid configurations
 /// and ensures all plugins meet requirements before compilation.
 pub mod compile_time_validation {
     use super::*;
-    
+
     // ✅ Valid plugin configurations
-    
+
     pub fn valid_browser() -> PluginMetadata {
         FastPluginBuilder::new()
             .id("valid.browser")
@@ -502,7 +515,7 @@ pub mod compile_time_validation {
             .requires_network() // At least one capability
             .build()
     }
-    
+
     pub fn valid_terminal() -> PluginMetadata {
         FastPluginBuilder::new()
             .id("valid.terminal")
@@ -510,7 +523,7 @@ pub mod compile_time_validation {
             .requires_keyboard() // At least one capability
             .build()
     }
-    
+
     pub fn valid_game() -> PluginMetadata {
         FastPluginBuilder::new()
             .id("valid.game")
@@ -518,9 +531,9 @@ pub mod compile_time_validation {
             .supports_3d_rendering() // At least one capability
             .build()
     }
-    
+
     // ❌ These would fail compilation if uncommented:
-    
+
     // Compilation error: Missing name
     // pub fn invalid_no_name() -> PluginMetadata {
     //     FastPluginBuilder::new()
@@ -529,8 +542,8 @@ pub mod compile_time_validation {
     //         .requires_network()
     //         .build()  // Compile error: name required
     // }
-    
-    // Compilation error: Missing ID  
+
+    // Compilation error: Missing ID
     // pub fn invalid_no_id() -> PluginMetadata {
     //     FastPluginBuilder::new()
     //         // .id("missing.id")  // Required!
@@ -538,7 +551,7 @@ pub mod compile_time_validation {
     //         .requires_network()
     //         .build()  // Compile error: id required
     // }
-    
+
     // Compilation error: No capabilities
     // pub fn invalid_no_capabilities() -> PluginMetadata {
     //     FastPluginBuilder::new()

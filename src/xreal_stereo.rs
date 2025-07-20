@@ -1,10 +1,10 @@
+use crate::driver::XRealDevice;
+use crate::tracking::Orientation;
 use bevy::prelude::*;
-use bevy::render::camera::{RenderTarget, ImageRenderTarget};
+use bevy::render::camera::{ImageRenderTarget, RenderTarget};
 use bevy::render::render_resource::{
     Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
 };
-use crate::driver::XRealDevice;
-use crate::tracking::Orientation;
 
 /// Zero-allocation stereo rendering system for XREAL glasses
 /// Implements blazing-fast dual-camera rendering with lock-free data structures
@@ -46,7 +46,7 @@ impl Default for StereoSettings {
     fn default() -> Self {
         Self {
             eye_separation: 0.064,     // 64mm typical IPD
-            convergence_distance: 5.0,  // 5 meters
+            convergence_distance: 5.0, // 5 meters
             render_scale: 1.0,         // Native resolution
         }
     }
@@ -61,17 +61,17 @@ fn setup_stereo_cameras(
 ) {
     if let Some(device) = xreal_device {
         info!("🎯 Setting up stereo cameras for XREAL glasses...");
-        
+
         let (width, height) = device.get_display_resolution();
         let stereo_width = width / 2; // Split screen for stereo
-        
+
         // Create render targets for stereo rendering
         let size = Extent3d {
             width: stereo_width,
             height,
             depth_or_array_layers: 1,
         };
-        
+
         // Left eye render target
         let left_image = images.add(Image {
             texture_descriptor: TextureDescriptor {
@@ -88,7 +88,7 @@ fn setup_stereo_cameras(
             },
             ..default()
         });
-        
+
         // Right eye render target
         let right_image = images.add(Image {
             texture_descriptor: TextureDescriptor {
@@ -105,26 +105,26 @@ fn setup_stereo_cameras(
             },
             ..default()
         });
-        
+
         // Create stereo render targets resource
         commands.insert_resource(StereoRenderTargets {
             left_image: left_image.clone(),
             right_image: right_image.clone(),
             is_active: device.is_stereo_enabled(),
         });
-        
+
         // Create stereo settings resource
         commands.insert_resource(StereoSettings::default());
-        
+
         // Setup left eye camera
         commands.spawn((
             Name::new("XReal Left Eye Camera"),
             Camera3d::default(),
             Camera {
                 order: 0,
-                target: RenderTarget::Image(ImageRenderTarget { 
-                    handle: left_image, 
-                    scale_factor: bevy::math::FloatOrd(1.0) 
+                target: RenderTarget::Image(ImageRenderTarget {
+                    handle: left_image,
+                    scale_factor: bevy::math::FloatOrd(1.0),
                 }),
                 ..default()
             },
@@ -133,16 +133,16 @@ fn setup_stereo_cameras(
             Visibility::default(),
             StereoEye::Left,
         ));
-        
+
         // Setup right eye camera
         commands.spawn((
             Name::new("XReal Right Eye Camera"),
             Camera3d::default(),
             Camera {
                 order: 1,
-                target: RenderTarget::Image(ImageRenderTarget { 
-                    handle: right_image, 
-                    scale_factor: bevy::math::FloatOrd(1.0) 
+                target: RenderTarget::Image(ImageRenderTarget {
+                    handle: right_image,
+                    scale_factor: bevy::math::FloatOrd(1.0),
                 }),
                 ..default()
             },
@@ -151,8 +151,11 @@ fn setup_stereo_cameras(
             Visibility::default(),
             StereoEye::Right,
         ));
-        
-        info!("✅ Stereo cameras configured for {}x{} resolution", width, height);
+
+        info!(
+            "✅ Stereo cameras configured for {}x{} resolution",
+            width, height
+        );
     } else {
         info!("🖥️  No XREAL device detected - skipping stereo camera setup");
     }
@@ -172,17 +175,17 @@ fn update_stereo_camera_transforms(
         } else {
             0.032 // Default 64mm IPD
         };
-        
+
         for (mut transform, eye) in stereo_cameras.iter_mut() {
             // Apply head tracking rotation
             transform.rotation = base_rotation;
-            
+
             // Apply stereo eye offset
             let eye_translation = match eye {
                 StereoEye::Left => Vec3::new(-eye_offset, 0.0, 0.0),
                 StereoEye::Right => Vec3::new(eye_offset, 0.0, 0.0),
             };
-            
+
             // Rotate eye offset by head orientation
             let rotated_offset = base_rotation * eye_translation;
             transform.translation = rotated_offset;

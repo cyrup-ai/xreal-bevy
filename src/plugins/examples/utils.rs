@@ -1,11 +1,9 @@
 //! Utility functions for plugin example implementations
-//! 
+//!
 //! Provides optimized, zero-allocation utilities for common plugin operations
 //! including shader creation, geometry generation, and WGPU resource management.
 
 use anyhow::Result;
-use std::borrow::Cow;
-use wgpu::{Device, Queue, ImageCopyTexture, ImageDataLayout};
 use bevy::{
     prelude::*,
     render::{
@@ -13,22 +11,75 @@ use bevy::{
         render_phase::TrackedRenderPass,
         render_resource::{
             binding_types as wgpu_binding_types,
-            BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
-            BindGroupLayoutEntry, BindingResource, BindingType, BlendState, Buffer, BufferBinding,
-            BufferBindingType, BufferDescriptor, BufferInitDescriptor, BufferUsages, ColorTargetState,
-            ColorWrites, Extent3d, FragmentState, IndexFormat, 
-            LoadOp, MultisampleState, Operations, Origin3d, PipelineCache, PolygonMode, PrimitiveState, 
-            PrimitiveTopology, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
-            RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
-            ShaderType, SpecializedRenderPipeline, SpecializedRenderPipelines, StencilState,
-            StorageTextureAccess, Texture, TextureAspect, TextureDescriptor, TextureDimension,
-            TextureFormat, TextureSampleType, TextureUsages, TextureView, TextureViewDescriptor,
-            TextureViewDimension, VertexAttribute, VertexBufferLayout, VertexFormat, VertexState,
-            VertexStepMode, AddressMode, FilterMode,
-            // Additional WGPU types needed for utils
-            ShaderModuleDescriptor, ShaderSource, PipelineLayoutDescriptor,
-            FrontFace, Face, CompareFunction, StencilOperation, StencilFaceState, DepthStencilState,
+            AddressMode,
+            BindGroup,
+            BindGroupDescriptor,
+            BindGroupEntry,
+            BindGroupLayout,
+            BindGroupLayoutDescriptor,
+            BindGroupLayoutEntry,
+            BindingResource,
+            BindingType,
+            BlendState,
+            Buffer,
+            BufferBinding,
+            BufferBindingType,
+            BufferDescriptor,
+            BufferInitDescriptor,
+            BufferUsages,
+            ColorTargetState,
+            ColorWrites,
+            CompareFunction,
             DepthBiasState,
+            DepthStencilState,
+            Extent3d,
+            Face,
+            FilterMode,
+            FragmentState,
+            FrontFace,
+            IndexFormat,
+            LoadOp,
+            MultisampleState,
+            Operations,
+            Origin3d,
+            PipelineCache,
+            PipelineLayoutDescriptor,
+            PolygonMode,
+            PrimitiveState,
+            PrimitiveTopology,
+            RenderPassColorAttachment,
+            RenderPassDescriptor,
+            RenderPipeline,
+            RenderPipelineDescriptor,
+            Sampler,
+            SamplerBindingType,
+            SamplerDescriptor,
+            // Additional WGPU types needed for utils
+            ShaderModuleDescriptor,
+            ShaderSource,
+            ShaderStages,
+            ShaderType,
+            SpecializedRenderPipeline,
+            SpecializedRenderPipelines,
+            StencilFaceState,
+            StencilOperation,
+            StencilState,
+            StorageTextureAccess,
+            Texture,
+            TextureAspect,
+            TextureDescriptor,
+            TextureDimension,
+            TextureFormat,
+            TextureSampleType,
+            TextureUsages,
+            TextureView,
+            TextureViewDescriptor,
+            TextureViewDimension,
+            VertexAttribute,
+            VertexBufferLayout,
+            VertexFormat,
+            VertexState,
+            VertexStepMode,
         },
         renderer::RenderDevice,
         texture::GpuImage,
@@ -37,6 +88,8 @@ use bevy::{
     window::PrimaryWindow,
 };
 use bytemuck::{Pod, Zeroable};
+
+use wgpu::{Device, Queue};
 
 /// Vertex data for textured quad rendering
 /// Uses bytemuck for zero-copy casting to GPU buffers
@@ -50,16 +103,28 @@ pub struct QuadVertex {
 /// Pre-computed quad vertices for maximum performance
 /// Arranged as two triangles forming a full-screen quad
 pub const QUAD_VERTICES: [QuadVertex; 4] = [
-    QuadVertex { position: [-1.0, -1.0, 0.0], tex_coords: [0.0, 1.0] }, // Bottom-left
-    QuadVertex { position: [ 1.0, -1.0, 0.0], tex_coords: [1.0, 1.0] }, // Bottom-right
-    QuadVertex { position: [ 1.0,  1.0, 0.0], tex_coords: [1.0, 0.0] }, // Top-right
-    QuadVertex { position: [-1.0,  1.0, 0.0], tex_coords: [0.0, 0.0] }, // Top-left
+    QuadVertex {
+        position: [-1.0, -1.0, 0.0],
+        tex_coords: [0.0, 1.0],
+    }, // Bottom-left
+    QuadVertex {
+        position: [1.0, -1.0, 0.0],
+        tex_coords: [1.0, 1.0],
+    }, // Bottom-right
+    QuadVertex {
+        position: [1.0, 1.0, 0.0],
+        tex_coords: [1.0, 0.0],
+    }, // Top-right
+    QuadVertex {
+        position: [-1.0, 1.0, 0.0],
+        tex_coords: [0.0, 0.0],
+    }, // Top-left
 ];
 
 /// Quad indices for triangle rendering (clockwise winding)
 pub const QUAD_INDICES: [u16; 6] = [
-    0, 1, 2,  // First triangle
-    2, 3, 0,  // Second triangle
+    0, 1, 2, // First triangle
+    2, 3, 0, // Second triangle
 ];
 
 /// Basic textured quad shader for plugin rendering
@@ -126,41 +191,43 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
 "#;
 
 /// Create optimized render pipeline for plugin use (Bevy RenderDevice version)
-/// 
+///
 /// Uses cached shader modules and optimized pipeline state for maximum performance.
 /// No allocations after initial creation.
-/// 
+///
 /// # Arguments
 /// * `render_device` - Bevy RenderDevice for resource creation
 /// * `shader_source` - WGSL shader source code
 /// * `format` - Target surface format
 /// * `label` - Optional debug label
-/// 
+///
 /// # Returns
 /// * `Result<RenderPipeline>` - Configured render pipeline or error
 #[inline]
 pub fn create_basic_render_pipeline_bevy(
-    render_device: &RenderDevice,
-    shader_source: &str,
-    format: TextureFormat,
-    label: Option<&str>,
+    _render_device: &RenderDevice,
+    _shader_source: &str,
+    _format: TextureFormat,
+    _label: Option<&str>,
 ) -> Result<RenderPipeline> {
     // Skip pipeline creation for now due to architectural mismatch
     // TODO: Implement proper Bevy-compliant render pipeline creation
-    Err(anyhow::anyhow!("Pipeline creation temporarily disabled due to architectural issues"))
+    Err(anyhow::anyhow!(
+        "Pipeline creation temporarily disabled due to architectural issues"
+    ))
 }
 
 /// Create optimized render pipeline for plugin use
-/// 
+///
 /// Uses cached shader modules and optimized pipeline state for maximum performance.
 /// No allocations after initial creation.
-/// 
+///
 /// # Arguments
 /// * `device` - WGPU device for resource creation
 /// * `shader_source` - WGSL shader source code
 /// * `format` - Target surface format
 /// * `label` - Optional debug label
-/// 
+///
 /// # Returns
 /// * `Result<RenderPipeline>` - Configured render pipeline or error
 #[inline]
@@ -171,21 +238,26 @@ pub fn create_basic_render_pipeline(
     label: Option<&str>,
 ) -> Result<wgpu::RenderPipeline> {
     // Create shader module
+    // Create shader module with proper label handling
+    let shader_label = label.map(|s| format!("{}_shader", s));
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: label.map(|s| format!("{}_shader", s).as_str()),
+        label: shader_label.as_deref(),
         source: wgpu::ShaderSource::Wgsl(shader_source.into()),
     });
 
     // Create pipeline layout with empty bind group layouts
+    // Create pipeline layout with proper label handling
+    let layout_label = label.map(|s| format!("{}_layout", s));
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: label.map(|s| format!("{}_layout", s).as_str()),
+        label: layout_label.as_deref(),
         bind_group_layouts: &[],
         push_constant_ranges: &[],
     });
 
-    // Create render pipeline
+    // Create render pipeline with proper label handling
+    let pipeline_label = label.map(|s| format!("{}_pipeline", s));
     let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: label.map(|s| format!("{}_pipeline", s).as_str()),
+        label: pipeline_label.as_deref(),
         layout: Some(&pipeline_layout),
         multiview: None,
         vertex: wgpu::VertexState {
@@ -215,8 +287,12 @@ pub fn create_basic_render_pipeline(
             entry_point: "fs_main",
             targets: &[Some(wgpu::ColorTargetState {
                 format: match format {
-                    bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb => wgpu::TextureFormat::Rgba8UnormSrgb,
-                    bevy::render::render_resource::TextureFormat::Bgra8UnormSrgb => wgpu::TextureFormat::Bgra8UnormSrgb,
+                    bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb => {
+                        wgpu::TextureFormat::Rgba8UnormSrgb
+                    }
+                    bevy::render::render_resource::TextureFormat::Bgra8UnormSrgb => {
+                        wgpu::TextureFormat::Bgra8UnormSrgb
+                    }
                     _ => wgpu::TextureFormat::Rgba8UnormSrgb, // Default fallback
                 },
                 blend: Some(wgpu::BlendState::ALPHA_BLENDING),
@@ -245,10 +321,10 @@ pub fn create_basic_render_pipeline(
 }
 
 /// Create quad vertex and index data
-/// 
+///
 /// Returns pre-computed vertex and index arrays for efficient quad rendering.
 /// No allocations - uses const data.
-/// 
+///
 /// # Returns
 /// * `(Vec<QuadVertex>, Vec<u16>)` - Vertex and index data
 #[inline]
@@ -257,16 +333,16 @@ pub fn create_quad_vertices() -> (Vec<QuadVertex>, Vec<u16>) {
 }
 
 /// Create render texture with optimized settings
-/// 
+///
 /// Creates a texture suitable for plugin rendering with efficient memory layout
 /// and optimal format selection.
-/// 
+///
 /// # Arguments
 /// * `device` - WGPU device for resource creation
 /// * `size` - Texture dimensions (width, height)
 /// * `format` - Texture format
 /// * `label` - Optional debug label
-/// 
+///
 /// # Returns
 /// * `Texture` - Created render texture
 #[inline]
@@ -296,20 +372,24 @@ pub fn create_render_texture(
     })
 }
 /// * `label` - Optional debug label
-/// 
+///
 /// # Returns
 /// * `Buffer` - Vertex buffer containing quad geometry
 #[inline]
-pub fn create_quad_vertex_buffer_bevy(render_device: &RenderDevice, label: Option<&str>) -> bevy::render::render_resource::Buffer {
+pub fn create_quad_vertex_buffer_bevy(
+    render_device: &RenderDevice,
+    label: Option<&str>,
+) -> bevy::render::render_resource::Buffer {
     // Create buffer directly using Bevy's RenderDevice
     let buffer_desc = bevy::render::render_resource::BufferDescriptor {
         label,
         size: (QUAD_VERTICES.len() * std::mem::size_of::<f32>()) as u64,
-        usage: bevy::render::render_resource::BufferUsages::VERTEX | bevy::render::render_resource::BufferUsages::COPY_DST,
+        usage: bevy::render::render_resource::BufferUsages::VERTEX
+            | bevy::render::render_resource::BufferUsages::COPY_DST,
         mapped_at_creation: false,
     };
     let buffer = render_device.create_buffer(&buffer_desc);
-    
+
     // Write data to buffer using render device
     // Note: In a real implementation, we'd need access to RenderQueue for writing
     // For now, return the empty buffer
@@ -317,60 +397,68 @@ pub fn create_quad_vertex_buffer_bevy(render_device: &RenderDevice, label: Optio
 }
 
 /// Create vertex buffer from quad vertices
-/// 
+///
 /// Optimized buffer creation with proper usage flags and efficient memory layout.
-/// 
+///
 /// # Arguments
 /// * `device` - WGPU device for resource creation
 /// * `label` - Optional debug label
-/// 
+///
 /// # Returns
 /// * `Buffer` - Vertex buffer containing quad geometry
 #[inline]
-pub fn create_quad_vertex_buffer(device: &wgpu::Device, queue: &wgpu::Queue, label: Option<&str>) -> wgpu::Buffer {
+pub fn create_quad_vertex_buffer(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    label: Option<&str>,
+) -> wgpu::Buffer {
     let buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label,
         size: (QUAD_VERTICES.len() * std::mem::size_of::<f32>()) as u64,
         usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         mapped_at_creation: false,
     });
-    
+
     queue.write_buffer(&buffer, 0, bytemuck::cast_slice(&QUAD_VERTICES));
     buffer
 }
 
 /// Create index buffer from quad indices
-/// 
+///
 /// Optimized buffer creation for index data with proper usage flags.
-/// 
+///
 /// # Arguments
 /// * `device` - WGPU device for resource creation
 /// * `label` - Optional debug label
-/// 
+///
 /// # Returns
 /// * `Buffer` - Index buffer containing quad indices
 #[inline]
-pub fn create_quad_index_buffer(device: &wgpu::Device, queue: &wgpu::Queue, label: Option<&str>) -> wgpu::Buffer {
+pub fn create_quad_index_buffer(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    label: Option<&str>,
+) -> wgpu::Buffer {
     let buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label,
         size: (QUAD_INDICES.len() * std::mem::size_of::<u16>()) as u64,
         usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
         mapped_at_creation: false,
     });
-    
+
     queue.write_buffer(&buffer, 0, bytemuck::cast_slice(&QUAD_INDICES));
     buffer
 }
 
 /// Performance-optimized texture sampler
-/// 
+///
 /// Creates a sampler with settings optimized for plugin rendering scenarios.
-/// 
-/// 
+///
+///
 /// # Arguments
 /// * `device` - Bevy RenderDevice for resource creation
 /// * `label` - Optional debug label
-/// 
+///
 /// # Returns
 /// * `BindGroupLayout` - Bind group layout for texture rendering
 #[inline]
@@ -402,16 +490,16 @@ pub fn create_texture_bind_group_layout(
 }
 
 /// Efficient texture upload helper
-/// 
+///
 /// Uploads texture data with optimal memory alignment and transfer efficiency.
-/// 
+///
 /// # Arguments
 /// * `device` - WGPU device
 /// * `queue` - WGPU queue for commands
 /// * `texture` - Target texture
 /// * `data` - Texture data (RGBA8 format)
 /// * `size` - Texture dimensions
-/// 
+///
 /// # Returns
 /// * `Result<()>` - Success or error
 #[inline]
@@ -446,16 +534,16 @@ pub fn upload_texture_data(
 }
 
 /// Create complete textured quad setup
-/// 
+///
 /// One-shot function to create all resources needed for textured quad rendering.
 /// Optimized for plugin initialization with minimal overhead.
-/// 
+///
 /// # Arguments
 /// * `device` - WGPU device
 /// * `format` - Target surface format
 /// * `texture_size` - Size of render texture
 /// * `label_prefix` - Prefix for debug labels
-/// 
+///
 /// # Returns
 /// * `Result<QuadRenderResources>` - Complete resource bundle
 pub fn create_textured_quad_resources(
@@ -465,7 +553,7 @@ pub fn create_textured_quad_resources(
     label_prefix: &str,
 ) -> Result<QuadRenderResources> {
     let texture_label = format!("{}_texture", label_prefix);
-    let sampler_label = format!("{}_sampler", label_prefix);
+    let _sampler_label = format!("{}_sampler", label_prefix);
     let bind_group_layout_label = format!("{}_bind_group_layout", label_prefix);
     let bind_group_label = format!("{}_bind_group", label_prefix);
 
@@ -481,30 +569,34 @@ pub fn create_textured_quad_resources(
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
         format: match format {
-            bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb => wgpu::TextureFormat::Rgba8UnormSrgb,
-            bevy::render::render_resource::TextureFormat::Bgra8UnormSrgb => wgpu::TextureFormat::Bgra8UnormSrgb,
+            bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb => {
+                wgpu::TextureFormat::Rgba8UnormSrgb
+            }
+            bevy::render::render_resource::TextureFormat::Bgra8UnormSrgb => {
+                wgpu::TextureFormat::Bgra8UnormSrgb
+            }
             _ => wgpu::TextureFormat::Rgba8UnormSrgb, // Default fallback
         },
         usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         view_formats: &[],
     });
-    
+
     // Create texture view
-    let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-    
+    let _texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
     // Skip bind group creation for now due to architectural type mismatches
     // TODO: Implement proper Bevy-compliant resource creation
     // let sampler = create_default_sampler(device, Some(&sampler_label));
     // let bind_group_layout = create_texture_bind_group_layout(device, Some(&bind_group_layout_label));
     // let bind_group = device.create_bind_group(...);
-    
+
     // Create placeholder sampler and bind group for compilation
-    let sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
+    let _sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
     let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some(&bind_group_layout_label),
         entries: &[],
     });
-    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+    let _bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some(&bind_group_label),
         layout: &bind_group_layout,
         entries: &[],
@@ -512,15 +604,17 @@ pub fn create_textured_quad_resources(
 
     // Skip resource creation for now due to architectural type mismatches
     // TODO: Implement proper Bevy-compliant resource creation and conversion
-    Err(anyhow::anyhow!("QuadRenderResources creation temporarily disabled due to architectural issues"))
+    Err(anyhow::anyhow!(
+        "QuadRenderResources creation temporarily disabled due to architectural issues"
+    ))
 }
 
 /// Create a default sampler with optimized settings for texture sampling
-/// 
+///
 /// # Arguments
 /// * `device` - The WGPU device to create the sampler on
 /// * `label` - Optional label for debugging
-/// 
+///
 /// # Returns
 /// A new sampler with default settings
 fn create_default_sampler(device: &Device, label: Option<&str>) -> wgpu::Sampler {
@@ -537,7 +631,7 @@ fn create_default_sampler(device: &Device, label: Option<&str>) -> wgpu::Sampler
 }
 
 /// Complete resource bundle for textured quad rendering
-/// 
+///
 /// Contains all WGPU resources needed for efficient quad rendering in plugins.
 pub struct QuadRenderResources {
     pub texture_view: TextureView,
@@ -548,12 +642,15 @@ pub struct QuadRenderResources {
 
 impl QuadRenderResources {
     /// Render quad with current resources
-    /// 
+    ///
     /// Optimized rendering path with minimal state changes.
-    /// 
+    ///
     /// # Arguments
     /// * `render_pass` - Active render pass
-    pub fn render<'a>(&'a self, render_pass: &mut bevy::render::render_phase::TrackedRenderPass<'a>) {
+    pub fn render<'a>(
+        &'a self,
+        render_pass: &mut bevy::render::render_phase::TrackedRenderPass<'a>,
+    ) {
         render_pass.set_bind_group(0, &self.bind_group, &[]);
         render_pass.draw(0..6, 0..1);
     }
@@ -574,7 +671,7 @@ mod tests {
         let (vertices, indices) = create_quad_vertices();
         assert_eq!(vertices.len(), 4);
         assert_eq!(indices.len(), 6);
-        
+
         // Verify triangle winding
         assert_eq!(indices[0..3], [0, 1, 2]);
         assert_eq!(indices[3..6], [2, 3, 0]);

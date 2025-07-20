@@ -1,18 +1,20 @@
 //! Ultra-Fast Zero-Allocation Plugin Builder
-//! 
+//!
 //! This module provides a blazing-fast, zero-allocation plugin builder using
 //! const generics for compile-time state validation. All operations are
 //! zero-cost abstractions with no runtime overhead.
 
-use core::marker::PhantomData;
-use crate::plugins::{PluginCapabilities, PluginCapabilitiesFlags, PluginMetadata, SurfaceRequirements};
 use super::fast_data::{
-    PluginId, PluginName, PluginDescription, PluginAuthor, PluginVersion,
-    PluginDependencies, SmallString, FixedVec,
+    FixedVec, PluginAuthor, PluginDependencies, PluginDescription, PluginId, PluginName,
+    PluginVersion, SmallString,
 };
+use crate::plugins::{
+    PluginCapabilities, PluginCapabilitiesFlags, PluginMetadata, SurfaceRequirements,
+};
+use core::marker::PhantomData;
 
 /// Compile-time builder state encoding
-/// 
+///
 /// Uses const generics to encode the builder state at compile time,
 /// ensuring zero runtime overhead and compile-time validation.
 pub struct BuilderState<const HAS_ID: bool, const HAS_NAME: bool, const HAS_CAPS: u8>;
@@ -31,7 +33,7 @@ pub mod caps {
 }
 
 /// Ultra-fast zero-allocation plugin builder
-/// 
+///
 /// All state is encoded at compile time using const generics.
 /// Builder operations are zero-cost abstractions that only
 /// affect the type system, not runtime performance.
@@ -64,7 +66,7 @@ pub struct FastPluginBuilder<const HAS_ID: bool, const HAS_NAME: bool, const HAS
 /// Initial builder state - no fields configured
 impl FastPluginBuilder<false, false, { caps::NONE }> {
     /// Create a new ultra-fast plugin builder
-    /// 
+    ///
     /// This is a zero-cost operation that creates a builder with
     /// all fields in their default state.
     #[inline(always)]
@@ -93,14 +95,12 @@ impl FastPluginBuilder<false, false, { caps::NONE }> {
 }
 
 /// Builder with no ID set - must set ID first
-impl<const HAS_NAME: bool, const HAS_CAPS: u8> 
-    FastPluginBuilder<false, HAS_NAME, HAS_CAPS> 
-{
+impl<const HAS_NAME: bool, const HAS_CAPS: u8> FastPluginBuilder<false, HAS_NAME, HAS_CAPS> {
     /// Set the unique plugin identifier
-    /// 
+    ///
     /// This is a zero-cost type transformation that encodes the ID
     /// in the type system for compile-time validation.
-    /// 
+    ///
     /// # Example
     /// ```rust
     /// let builder = FastPluginBuilder::new()
@@ -131,10 +131,10 @@ impl<const HAS_NAME: bool, const HAS_CAPS: u8>
 /// Builder with ID set but no name - must set name next
 impl<const HAS_CAPS: u8> FastPluginBuilder<true, false, HAS_CAPS> {
     /// Set the human-readable plugin name
-    /// 
+    ///
     /// Zero-cost type transformation that validates name is set
     /// before capabilities can be finalized.
-    /// 
+    ///
     /// # Example
     /// ```rust
     /// .name("XREAL Web Browser")
@@ -162,11 +162,11 @@ impl<const HAS_CAPS: u8> FastPluginBuilder<true, false, HAS_CAPS> {
 }
 
 /// Common builder methods available in all valid states
-impl<const HAS_ID: bool, const HAS_NAME: bool, const HAS_CAPS: u8> 
-    FastPluginBuilder<HAS_ID, HAS_NAME, HAS_CAPS> 
+impl<const HAS_ID: bool, const HAS_NAME: bool, const HAS_CAPS: u8>
+    FastPluginBuilder<HAS_ID, HAS_NAME, HAS_CAPS>
 {
     /// Set the plugin version
-    /// 
+    ///
     /// Zero-cost operation that updates the version string.
     #[inline(always)]
     pub const fn version(self, version: &'static str) -> Self {
@@ -188,7 +188,7 @@ impl<const HAS_ID: bool, const HAS_NAME: bool, const HAS_CAPS: u8>
             _phantom: self._phantom,
         }
     }
-    
+
     /// Set the plugin description
     #[inline(always)]
     pub const fn description(self, description: &'static str) -> Self {
@@ -210,7 +210,7 @@ impl<const HAS_ID: bool, const HAS_NAME: bool, const HAS_CAPS: u8>
             _phantom: self._phantom,
         }
     }
-    
+
     /// Set the plugin author
     #[inline(always)]
     pub const fn author(self, author: &'static str) -> Self {
@@ -232,7 +232,7 @@ impl<const HAS_ID: bool, const HAS_NAME: bool, const HAS_CAPS: u8>
             _phantom: self._phantom,
         }
     }
-    
+
     /// Set surface dimensions
     #[inline(always)]
     pub const fn surface_size(self, width: u32, height: u32) -> Self {
@@ -242,7 +242,7 @@ impl<const HAS_ID: bool, const HAS_NAME: bool, const HAS_CAPS: u8>
             ..self
         }
     }
-    
+
     /// Set preferred update rate
     #[inline(always)]
     pub const fn update_rate(self, hz: u32) -> Self {
@@ -251,7 +251,7 @@ impl<const HAS_ID: bool, const HAS_NAME: bool, const HAS_CAPS: u8>
             ..self
         }
     }
-    
+
     /// Set minimum engine version
     #[inline(always)]
     pub const fn requires_engine(self, version: &'static str) -> Self {
@@ -296,7 +296,7 @@ impl<const HAS_CAPS: u8> FastPluginBuilder<true, true, HAS_CAPS> {
             _phantom: PhantomData,
         }
     }
-    
+
     /// Require keyboard focus
     #[inline(always)]
     pub const fn requires_keyboard(self) -> FastPluginBuilder<true, true, 255> {
@@ -315,7 +315,7 @@ impl<const HAS_CAPS: u8> FastPluginBuilder<true, true, HAS_CAPS> {
             _phantom: PhantomData,
         }
     }
-    
+
     /// Enable multi-window support
     #[inline(always)]
     pub const fn supports_multi_window(self) -> FastPluginBuilder<true, true, 255> {
@@ -334,7 +334,7 @@ impl<const HAS_CAPS: u8> FastPluginBuilder<true, true, HAS_CAPS> {
             _phantom: PhantomData,
         }
     }
-    
+
     /// Enable 3D rendering
     #[allow(dead_code)]
     #[inline(always)]
@@ -354,7 +354,7 @@ impl<const HAS_CAPS: u8> FastPluginBuilder<true, true, HAS_CAPS> {
             _phantom: PhantomData,
         }
     }
-    
+
     /// Enable compute shaders
     #[allow(dead_code)]
     #[inline(always)]
@@ -374,7 +374,7 @@ impl<const HAS_CAPS: u8> FastPluginBuilder<true, true, HAS_CAPS> {
             _phantom: PhantomData,
         }
     }
-    
+
     /// Require network access
     #[inline(always)]
     pub const fn requires_network(self) -> FastPluginBuilder<true, true, 255> {
@@ -393,7 +393,7 @@ impl<const HAS_CAPS: u8> FastPluginBuilder<true, true, HAS_CAPS> {
             _phantom: PhantomData,
         }
     }
-    
+
     /// Enable file system access
     #[inline(always)]
     pub const fn supports_file_system(self) -> FastPluginBuilder<true, true, 255> {
@@ -412,7 +412,7 @@ impl<const HAS_CAPS: u8> FastPluginBuilder<true, true, HAS_CAPS> {
             _phantom: PhantomData,
         }
     }
-    
+
     /// Enable audio support
     #[inline(always)]
     pub const fn supports_audio(self) -> FastPluginBuilder<true, true, 255> {
@@ -436,11 +436,11 @@ impl<const HAS_CAPS: u8> FastPluginBuilder<true, true, HAS_CAPS> {
 /// Build method - only available when all required fields are set and at least one capability  
 impl<const HAS_CAPS: u8> FastPluginBuilder<true, true, HAS_CAPS> {
     /// Build the final plugin metadata
-    /// 
+    ///
     /// This method is only available when all required fields are set
     /// and at least one capability is configured. The const generic
     /// constraint ensures compilation fails if capabilities are missing.
-    /// 
+    ///
     /// # Performance
     /// This is a zero-allocation operation that constructs the metadata
     /// from compile-time known values.
@@ -448,7 +448,7 @@ impl<const HAS_CAPS: u8> FastPluginBuilder<true, true, HAS_CAPS> {
     pub fn build(self) -> PluginMetadata {
         // Convert compile-time capability bits to runtime capabilities
         let mut capabilities = PluginCapabilitiesFlags::new();
-        
+
         if (HAS_CAPS & caps::TRANSPARENCY) != 0 {
             capabilities.set_flag(PluginCapabilitiesFlags::SUPPORTS_TRANSPARENCY);
         }
@@ -473,7 +473,7 @@ impl<const HAS_CAPS: u8> FastPluginBuilder<true, true, HAS_CAPS> {
         if (HAS_CAPS & caps::AUDIO) != 0 {
             capabilities.set_flag(PluginCapabilitiesFlags::SUPPORTS_AUDIO);
         }
-        
+
         PluginMetadata {
             id: self.id,
             name: self.name,
@@ -495,9 +495,9 @@ impl<const HAS_CAPS: u8> FastPluginBuilder<true, true, HAS_CAPS> {
             library_path: std::path::PathBuf::new(),
         }
     }
-    
+
     /// Extract just the capabilities for use in plugin implementations
-    /// 
+    ///
     /// Zero-allocation method that returns the capabilities struct
     /// constructed from compile-time capability bits.
     #[inline(always)]
@@ -518,7 +518,7 @@ impl<const HAS_CAPS: u8> FastPluginBuilder<true, true, HAS_CAPS> {
             },
         }
     }
-    
+
     /// Get surface requirements
     #[allow(dead_code)]
     #[inline]
@@ -540,7 +540,7 @@ impl<const HAS_CAPS: u8> FastPluginBuilder<true, true, HAS_CAPS> {
 }
 
 /// Ultra-fast macro for common plugin configurations
-/// 
+///
 /// Generates compile-time optimized plugin builders for common patterns.
 /// All expansion happens at compile time with zero runtime overhead.
 #[macro_export]
@@ -556,8 +556,8 @@ macro_rules! fast_plugin {
             .supports_audio()
             .update_rate(60)
     };
-    
-    // Terminal-like plugin  
+
+    // Terminal-like plugin
     (terminal: $id:literal, $name:literal) => {
         $crate::plugins::fast_builder::FastPluginBuilder::new()
             .id($id)
@@ -567,7 +567,7 @@ macro_rules! fast_plugin {
             .supports_multi_window()
             .update_rate(30)
     };
-    
+
     // Game-like plugin
     (game: $id:literal, $name:literal) => {
         $crate::plugins::fast_builder::FastPluginBuilder::new()
@@ -579,7 +579,7 @@ macro_rules! fast_plugin {
             .supports_audio()
             .update_rate(60)
     };
-    
+
     // Basic plugin
     (basic: $id:literal, $name:literal) => {
         $crate::plugins::fast_builder::FastPluginBuilder::new()
@@ -599,7 +599,7 @@ pub type NewPluginBuilder = FastPluginBuilder<false, false, { caps::NONE }>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_basic_builder() {
         let metadata = FastPluginBuilder::new()
@@ -607,12 +607,12 @@ mod tests {
             .name("Test Plugin")
             .supports_transparency()
             .build();
-        
+
         assert_eq!(metadata.id, "test.plugin");
         assert_eq!(metadata.name, "Test Plugin");
         assert!(metadata.capabilities.supports_transparency);
     }
-    
+
     #[test]
     fn test_browser_builder() {
         let metadata = FastPluginBuilder::new()
@@ -623,26 +623,26 @@ mod tests {
             .supports_audio()
             .update_rate(60)
             .build();
-        
+
         assert!(metadata.capabilities.requires_network_access);
         assert!(metadata.capabilities.requires_keyboard_focus);
         assert!(metadata.capabilities.supports_audio);
         assert_eq!(metadata.capabilities.preferred_update_rate, Some(60));
     }
-    
+
     #[test]
     fn test_macro() {
         let metadata = fast_plugin!(browser: "test.browser", "Test Browser").build();
         assert!(metadata.capabilities.requires_network_access);
         assert!(metadata.capabilities.requires_keyboard_focus);
-        
+
         let metadata = fast_plugin!(terminal: "test.terminal", "Test Terminal").build();
         assert!(metadata.capabilities.requires_keyboard_focus);
         assert!(metadata.capabilities.supports_file_system);
     }
-    
+
     // These should fail compilation if uncommented:
-    
+
     // #[test]
     // fn test_incomplete_builder() {
     //     let metadata = FastPluginBuilder::new()
@@ -651,8 +651,8 @@ mod tests {
     //         .supports_transparency()
     //         .build(); // Should fail to compile
     // }
-    
-    // #[test] 
+
+    // #[test]
     // fn test_no_capabilities() {
     //     let metadata = FastPluginBuilder::new()
     //         .id("test")

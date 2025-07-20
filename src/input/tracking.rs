@@ -1,5 +1,5 @@
-use bevy::prelude::*;
 use bevy::math::Quat;
+use bevy::prelude::*;
 
 /// Tracks the orientation of the XREAL glasses
 #[derive(Resource, Default, Debug)]
@@ -21,29 +21,29 @@ impl Orientation {
             last_update: 0.0,
         }
     }
-    
+
     /// Update the current orientation
     pub fn update(&mut self, rotation: Quat, timestamp: f64) {
         self.rotation = rotation;
         self.last_update = timestamp;
         self.is_tracking = true;
     }
-    
+
     /// Get the forward direction vector
     pub fn forward(&self) -> Vec3 {
         (self.rotation * -Vec3::Z).normalize()
     }
-    
+
     /// Get the up direction vector
     pub fn up(&self) -> Vec3 {
         (self.rotation * Vec3::Y).normalize()
     }
-    
+
     /// Get the right direction vector
     pub fn right(&self) -> Vec3 {
         (self.rotation * Vec3::X).normalize()
     }
-    
+
     /// Get the euler angles (pitch, yaw, roll) in radians
     pub fn to_euler(&self) -> (f32, f32, f32) {
         let (pitch, yaw, roll) = self.rotation.to_euler(EulerRot::YXZ);

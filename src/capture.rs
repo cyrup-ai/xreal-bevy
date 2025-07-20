@@ -16,6 +16,7 @@ pub struct CaptureTask(pub Task<CommandQueue>);
 #[derive(Resource)]
 pub struct ScreenCaptures {
     pub num_streams: usize,
+    pub capture_requested: bool,
     capturer: Option<Capturer>,
     // Pre-allocated buffer pool for zero hot-path allocations
     rgba_buffer: Vec<u8>,
@@ -45,14 +46,15 @@ impl ScreenCaptures {
 
         // Get available capture targets for multi-display support
         let targets = get_all_targets();
-        let display_targets: Vec<_> = targets.into_iter()
+        let display_targets: Vec<_> = targets
+            .into_iter()
             .filter(|target| matches!(target, scap::Target::Display(_)))
             .collect();
         let num_displays = display_targets.len().max(1);
 
         // Use async framerate detection for optimal performance
         let target_fps = Self::detect_optimal_framerate_async().await;
-        
+
         let options = Options {
             fps: target_fps, // Adaptive: 120Hz for Pro, 72Hz for Air, 60Hz fallback
             target: display_targets.first().cloned(), // Use first display
@@ -80,9 +82,10 @@ impl ScreenCaptures {
             capturer: Some(capturer),
             rgba_buffer,
             buffer_capacity: MAX_BUFFER_SIZE,
+            capture_requested: false,
         })
     }
-    
+
     #[inline]
     pub fn new() -> Result<Self> {
         // Check platform support first
@@ -99,14 +102,15 @@ impl ScreenCaptures {
 
         // Get available capture targets for multi-display support
         let targets = get_all_targets();
-        let display_targets: Vec<_> = targets.into_iter()
+        let display_targets: Vec<_> = targets
+            .into_iter()
             .filter(|target| matches!(target, scap::Target::Display(_)))
             .collect();
         let num_displays = display_targets.len().max(1);
 
         // Adaptive frame rate for commercial compatibility (all XREAL models)
         let target_fps = Self::detect_optimal_framerate();
-        
+
         let options = Options {
             fps: target_fps, // Adaptive: 120Hz for Pro, 72Hz for Air, 60Hz fallback
             target: display_targets.first().cloned(), // Use first display
@@ -134,6 +138,7 @@ impl ScreenCaptures {
             capturer: Some(capturer),
             rgba_buffer,
             buffer_capacity: MAX_BUFFER_SIZE,
+            capture_requested: false,
         })
     }
 
@@ -141,7 +146,7 @@ impl ScreenCaptures {
     /// Returns a future that resolves to the optimal framerate
     async fn detect_optimal_framerate_async() -> u32 {
         use bevy::tasks::AsyncComputeTaskPool;
-        
+
         let task_pool = AsyncComputeTaskPool::get();
         let task = task_pool.spawn(async {
             // Try to detect display refresh rate for optimal performance
@@ -152,24 +157,24 @@ impl ScreenCaptures {
                 .await
             {
                 let display_info = String::from_utf8_lossy(&output.stdout);
-                
+
                 // Check for high refresh rate capabilities
                 if display_info.contains("120") || display_info.contains(" 120 ") {
                     return 120; // XREAL 2 Pro
                 } else if display_info.contains("90") || display_info.contains(" 90 ") {
-                    return 90;  // XREAL 2
+                    return 90; // XREAL 2
                 } else if display_info.contains("72") || display_info.contains(" 72 ") {
-                    return 72;  // XREAL Air series
+                    return 72; // XREAL Air series
                 }
             }
-            
+
             // Safe fallback for all models
             60
         });
-        
+
         task.await
     }
-    
+
     /// Synchronous wrapper that provides fallback when async detection isn't available
     #[inline]
     fn detect_optimal_framerate() -> u32 {
@@ -187,7 +192,7 @@ impl ScreenCaptures {
         let thread_pool = AsyncComputeTaskPool::get();
         let task = thread_pool.spawn(async move {
             let mut command_queue = CommandQueue::default();
-            
+
             // Capture frame data in the async task
             command_queue.push(move |world: &mut World| {
                 // Get the screen captures resource to access the capturer
@@ -197,23 +202,34 @@ impl ScreenCaptures {
                         match capturer.get_next_frame() {
                             Ok(frame) => {
                                 // Convert frame data to Bevy Image using zero-allocation method
-                                if let Ok(image_data) = captures.frame_to_bevy_image_zero_alloc(frame) {
+                                if let Ok(image_data) =
+                                    captures.frame_to_bevy_image_zero_alloc(frame)
+                                {
                                     // Update the entity's material with the new texture
                                     if let Ok(entity_ref) = world.get_entity(entity) {
-                                        if let Some(screen_material) = entity_ref.get::<crate::render::ScreenMaterial>() {
+                                        if let Some(screen_material) =
+                                            entity_ref.get::<crate::render::ScreenMaterial>()
+                                        {
                                             let material_handle = screen_material.0.clone();
-                                            
+
                                             // Add image to assets first
-                                            let image_handle = if let Some(mut images) = world.get_resource_mut::<Assets<Image>>() {
+                                            let image_handle = if let Some(mut images) =
+                                                world.get_resource_mut::<Assets<Image>>()
+                                            {
                                                 images.add(image_data)
                                             } else {
                                                 return; // Can't access images resource
                                             };
-                                            
+
                                             // Then update material
-                                            if let Some(mut materials) = world.get_resource_mut::<Assets<StandardMaterial>>() {
-                                                if let Some(material) = materials.get_mut(&material_handle) {
-                                                    material.base_color_texture = Some(image_handle);
+                                            if let Some(mut materials) =
+                                                world.get_resource_mut::<Assets<StandardMaterial>>()
+                                            {
+                                                if let Some(material) =
+                                                    materials.get_mut(&material_handle)
+                                                {
+                                                    material.base_color_texture =
+                                                        Some(image_handle);
                                                 }
                                             }
                                         }
@@ -226,13 +242,13 @@ impl ScreenCaptures {
                         }
                     }
                 }
-                
+
                 // Remove the task component since we're done with this frame
                 if let Ok(mut entity_ref) = world.get_entity_mut(entity) {
                     entity_ref.remove::<CaptureTask>();
                 }
             });
-            
+
             command_queue
         });
 
@@ -250,9 +266,11 @@ impl ScreenCaptures {
 
         // Extract frame data based on scap Frame API
         let (width, height, data) = match frame {
-            Frame::BGRA(bgra_frame) => {
-                (bgra_frame.width as u32, bgra_frame.height as u32, bgra_frame.data)
-            }
+            Frame::BGRA(bgra_frame) => (
+                bgra_frame.width as u32,
+                bgra_frame.height as u32,
+                bgra_frame.data,
+            ),
             Frame::RGB(rgb_frame) => {
                 // Convert RGB to BGRA using pre-allocated buffer with vectorized operations
                 let required_size = rgb_frame.data.len() * 4 / 3;
@@ -260,24 +278,43 @@ impl ScreenCaptures {
                 if self.rgba_buffer.capacity() < required_size {
                     // Check if required size exceeds our maximum buffer capacity
                     if required_size > self.buffer_capacity {
-                        return Err(anyhow::anyhow!("Frame size {} exceeds buffer capacity {}", required_size, self.buffer_capacity));
+                        return Err(anyhow::anyhow!(
+                            "Frame size {} exceeds buffer capacity {}",
+                            required_size,
+                            self.buffer_capacity
+                        ));
                     }
-                    self.rgba_buffer.reserve(required_size - self.rgba_buffer.capacity());
+                    self.rgba_buffer
+                        .reserve(required_size - self.rgba_buffer.capacity());
                 }
-                
+
                 // Vectorized conversion for performance
                 for rgb_chunk in rgb_frame.data.chunks_exact(3) {
                     // Branchless conversion with direct indexing
-                    self.rgba_buffer.extend_from_slice(&[rgb_chunk[2], rgb_chunk[1], rgb_chunk[0], 255]);
+                    self.rgba_buffer.extend_from_slice(&[
+                        rgb_chunk[2],
+                        rgb_chunk[1],
+                        rgb_chunk[0],
+                        255,
+                    ]);
                 }
-                
+
                 // Handle remaining bytes if any
                 let remainder = rgb_frame.data.chunks_exact(3).remainder();
                 if remainder.len() >= 3 {
-                    self.rgba_buffer.extend_from_slice(&[remainder[2], remainder[1], remainder[0], 255]);
+                    self.rgba_buffer.extend_from_slice(&[
+                        remainder[2],
+                        remainder[1],
+                        remainder[0],
+                        255,
+                    ]);
                 }
-                
-                (rgb_frame.width as u32, rgb_frame.height as u32, std::mem::take(&mut self.rgba_buffer))
+
+                (
+                    rgb_frame.width as u32,
+                    rgb_frame.height as u32,
+                    std::mem::take(&mut self.rgba_buffer),
+                )
             }
             Frame::RGBx(rgbx_frame) => {
                 // RGBx format - vectorized conversion with pre-allocated buffer
@@ -286,17 +323,31 @@ impl ScreenCaptures {
                 if self.rgba_buffer.capacity() < required_size {
                     // Check if required size exceeds our maximum buffer capacity
                     if required_size > self.buffer_capacity {
-                        return Err(anyhow::anyhow!("Frame size {} exceeds buffer capacity {}", required_size, self.buffer_capacity));
+                        return Err(anyhow::anyhow!(
+                            "Frame size {} exceeds buffer capacity {}",
+                            required_size,
+                            self.buffer_capacity
+                        ));
                     }
-                    self.rgba_buffer.reserve(required_size - self.rgba_buffer.capacity());
+                    self.rgba_buffer
+                        .reserve(required_size - self.rgba_buffer.capacity());
                 }
-                
+
                 // Vectorized SIMD-friendly conversion
                 for rgba_chunk in rgbx_frame.data.chunks_exact(4) {
-                    self.rgba_buffer.extend_from_slice(&[rgba_chunk[2], rgba_chunk[1], rgba_chunk[0], 255]);
+                    self.rgba_buffer.extend_from_slice(&[
+                        rgba_chunk[2],
+                        rgba_chunk[1],
+                        rgba_chunk[0],
+                        255,
+                    ]);
                 }
-                
-                (rgbx_frame.width as u32, rgbx_frame.height as u32, std::mem::take(&mut self.rgba_buffer))
+
+                (
+                    rgbx_frame.width as u32,
+                    rgbx_frame.height as u32,
+                    std::mem::take(&mut self.rgba_buffer),
+                )
             }
             Frame::XBGR(xbgr_frame) => {
                 // XBGR format - optimized conversion
@@ -305,17 +356,31 @@ impl ScreenCaptures {
                 if self.rgba_buffer.capacity() < required_size {
                     // Check if required size exceeds our maximum buffer capacity
                     if required_size > self.buffer_capacity {
-                        return Err(anyhow::anyhow!("Frame size {} exceeds buffer capacity {}", required_size, self.buffer_capacity));
+                        return Err(anyhow::anyhow!(
+                            "Frame size {} exceeds buffer capacity {}",
+                            required_size,
+                            self.buffer_capacity
+                        ));
                     }
-                    self.rgba_buffer.reserve(required_size - self.rgba_buffer.capacity());
+                    self.rgba_buffer
+                        .reserve(required_size - self.rgba_buffer.capacity());
                 }
-                
+
                 // Vectorized conversion
                 for xbgr_chunk in xbgr_frame.data.chunks_exact(4) {
-                    self.rgba_buffer.extend_from_slice(&[xbgr_chunk[1], xbgr_chunk[2], xbgr_chunk[3], 255]);
+                    self.rgba_buffer.extend_from_slice(&[
+                        xbgr_chunk[1],
+                        xbgr_chunk[2],
+                        xbgr_chunk[3],
+                        255,
+                    ]);
                 }
-                
-                (xbgr_frame.width as u32, xbgr_frame.height as u32, std::mem::take(&mut self.rgba_buffer))
+
+                (
+                    xbgr_frame.width as u32,
+                    xbgr_frame.height as u32,
+                    std::mem::take(&mut self.rgba_buffer),
+                )
             }
             Frame::BGRx(bgrx_frame) => {
                 // BGRx format - already close to BGRA, minimal conversion needed
@@ -324,17 +389,31 @@ impl ScreenCaptures {
                 if self.rgba_buffer.capacity() < required_size {
                     // Check if required size exceeds our maximum buffer capacity
                     if required_size > self.buffer_capacity {
-                        return Err(anyhow::anyhow!("Frame size {} exceeds buffer capacity {}", required_size, self.buffer_capacity));
+                        return Err(anyhow::anyhow!(
+                            "Frame size {} exceeds buffer capacity {}",
+                            required_size,
+                            self.buffer_capacity
+                        ));
                     }
-                    self.rgba_buffer.reserve(required_size - self.rgba_buffer.capacity());
+                    self.rgba_buffer
+                        .reserve(required_size - self.rgba_buffer.capacity());
                 }
-                
+
                 // Direct copy with alpha channel replacement
                 for bgrx_chunk in bgrx_frame.data.chunks_exact(4) {
-                    self.rgba_buffer.extend_from_slice(&[bgrx_chunk[0], bgrx_chunk[1], bgrx_chunk[2], 255]);
+                    self.rgba_buffer.extend_from_slice(&[
+                        bgrx_chunk[0],
+                        bgrx_chunk[1],
+                        bgrx_chunk[2],
+                        255,
+                    ]);
                 }
-                
-                (bgrx_frame.width as u32, bgrx_frame.height as u32, std::mem::take(&mut self.rgba_buffer))
+
+                (
+                    bgrx_frame.width as u32,
+                    bgrx_frame.height as u32,
+                    std::mem::take(&mut self.rgba_buffer),
+                )
             }
             Frame::BGR0(bgr_frame) => {
                 // BGR0 format - similar to BGRx with optimized conversion
@@ -343,21 +422,37 @@ impl ScreenCaptures {
                 if self.rgba_buffer.capacity() < required_size {
                     // Check if required size exceeds our maximum buffer capacity
                     if required_size > self.buffer_capacity {
-                        return Err(anyhow::anyhow!("Frame size {} exceeds buffer capacity {}", required_size, self.buffer_capacity));
+                        return Err(anyhow::anyhow!(
+                            "Frame size {} exceeds buffer capacity {}",
+                            required_size,
+                            self.buffer_capacity
+                        ));
                     }
-                    self.rgba_buffer.reserve(required_size - self.rgba_buffer.capacity());
+                    self.rgba_buffer
+                        .reserve(required_size - self.rgba_buffer.capacity());
                 }
-                
+
                 // Vectorized conversion
                 for bgr_chunk in bgr_frame.data.chunks_exact(4) {
-                    self.rgba_buffer.extend_from_slice(&[bgr_chunk[0], bgr_chunk[1], bgr_chunk[2], 255]);
+                    self.rgba_buffer.extend_from_slice(&[
+                        bgr_chunk[0],
+                        bgr_chunk[1],
+                        bgr_chunk[2],
+                        255,
+                    ]);
                 }
-                
-                (bgr_frame.width as u32, bgr_frame.height as u32, std::mem::take(&mut self.rgba_buffer))
+
+                (
+                    bgr_frame.width as u32,
+                    bgr_frame.height as u32,
+                    std::mem::take(&mut self.rgba_buffer),
+                )
             }
             Frame::YUVFrame(_yuv_frame) => {
                 // YUV format requires specialized conversion - not implemented for performance
-                return Err(anyhow::anyhow!("YUV frame format not supported - use BGRA for optimal performance"));
+                return Err(anyhow::anyhow!(
+                    "YUV frame format not supported - use BGRA for optimal performance"
+                ));
             }
         };
 
@@ -375,6 +470,18 @@ impl ScreenCaptures {
         );
 
         Ok(image)
+    }
+}
+
+impl Default for ScreenCaptures {
+    fn default() -> Self {
+        Self {
+            num_streams: 0,
+            capture_requested: false,
+            capturer: None,
+            rgba_buffer: Vec::new(),
+            buffer_capacity: 0,
+        }
     }
 }
 

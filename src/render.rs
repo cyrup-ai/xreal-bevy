@@ -1,10 +1,10 @@
+use crate::capture::CaptureTask;
+use crate::{Orientation, ScreenCaptures, ScreenDistance};
 use bevy::prelude::*;
 use bevy::render::{
     render_asset::RenderAssetUsages,
     render_resource::{Extent3d, TextureDimension, TextureFormat},
 };
-use crate::{Orientation, ScreenCaptures, ScreenDistance};
-use crate::capture::CaptureTask;
 
 #[derive(Component)]
 pub struct VirtualScreen(pub usize);
@@ -21,7 +21,7 @@ pub fn setup_3d_scene(
     captures: Option<Res<ScreenCaptures>>,
 ) {
     let num_screens = captures.as_ref().map(|c| c.num_streams).unwrap_or(1);
-    
+
     // Create virtual screens with optimized spacing
     for i in 0..num_screens {
         let x = (i as f32 - (num_screens - 1) as f32 * 0.5) * 3.0;
@@ -37,16 +37,17 @@ pub fn setup_3d_scene(
             TextureFormat::Bgra8UnormSrgb,
             RenderAssetUsages::default(),
         );
-        
+
         let material_handle = materials.add(StandardMaterial {
             base_color_texture: Some(images.add(placeholder_image)),
             unlit: true,
             alpha_mode: AlphaMode::Opaque,
             ..default()
         });
-        
+
         let mesh_handle = meshes.add(Plane3d::new(Vec3::Y, Vec2::splat(2.0)));
-        commands.spawn_empty()
+        commands
+            .spawn_empty()
             .insert(Mesh3d(mesh_handle))
             .insert(MeshMaterial3d(material_handle.clone()))
             .insert(Transform::from_xyz(x, 0.0, -5.0))
@@ -63,15 +64,15 @@ pub fn setup_3d_scene(
 
     // Lighting setup
     commands.spawn((
-        PointLight { 
+        PointLight {
             intensity: 2000.0,
             range: 20.0,
             shadows_enabled: false,
-            ..default() 
+            ..default()
         },
         Transform::from_xyz(0.0, 5.0, 5.0),
     ));
-    
+
     // Ambient light for better visibility
     commands.insert_resource(AmbientLight {
         color: Color::WHITE,
@@ -82,8 +83,8 @@ pub fn setup_3d_scene(
 
 #[inline]
 pub fn update_camera_from_orientation(
-    mut query: Query<&mut Transform, With<Camera>>, 
-    orientation: Res<Orientation>
+    mut query: Query<&mut Transform, With<Camera>>,
+    orientation: Res<Orientation>,
 ) {
     if let Ok(mut transform) = query.single_mut() {
         transform.rotation = orientation.quat;
@@ -116,11 +117,11 @@ pub fn handle_capture_tasks(
     mut jitter_metrics: ResMut<crate::JitterMetrics>,
     time: Res<Time>,
 ) {
-    use bevy::tasks::{futures_lite::future, block_on};
-    
+    use bevy::tasks::{block_on, futures_lite::future};
+
     // Use high-precision timing for capture interval measurement
-    let current_time = time.elapsed_secs_f64() as f32 * 1000.0;
-    
+    let current_time = time.elapsed_secs_f64() * 1000.0;
+
     for mut task in &mut tasks {
         // Poll the task non-blocking - this is the only acceptable use of block_on for polling
         if let Some(mut command_queue) = block_on(future::poll_once(&mut task.0)) {
@@ -130,7 +131,7 @@ pub fn handle_capture_tasks(
                 jitter_metrics.add_capture_measurement(capture_interval);
             }
             jitter_metrics.last_capture_time = current_time;
-            
+
             // Apply the command queue to execute deferred world modifications
             commands.append(&mut command_queue);
         }
@@ -139,8 +140,8 @@ pub fn handle_capture_tasks(
 
 #[inline]
 pub fn update_screen_positions(
-    mut query: Query<&mut Transform, With<VirtualScreen>>, 
-    distance: Res<ScreenDistance>
+    mut query: Query<&mut Transform, With<VirtualScreen>>,
+    distance: Res<ScreenDistance>,
 ) {
     let dist = distance.0;
     for mut transform in &mut query {

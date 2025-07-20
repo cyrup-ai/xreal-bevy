@@ -1,6 +1,6 @@
-use bevy::prelude::*;
-use crate::tracking::Orientation;
 use crate::render::VirtualScreen;
+use crate::tracking::Orientation;
+use bevy::prelude::*;
 
 /// Head-tracked cursor component for AR interaction
 #[derive(Component)]
@@ -90,7 +90,7 @@ pub fn update_head_cursor(
     // Use real head tracking data for cursor positioning
     let head_rotation = orientation.quat;
     let head_position = Vec3::ZERO;
-    
+
     // Cast ray from head position in head direction
     let ray_origin = head_position;
     let ray_dir = head_rotation * Vec3::NEG_Z;
@@ -102,21 +102,21 @@ pub fn update_head_cursor(
     for (screen_transform, virtual_screen) in virtual_screens.iter() {
         let plane_normal = *screen_transform.forward();
         let denom = ray_dir.dot(plane_normal);
-        
+
         if denom.abs() <= 0.0001 {
             continue;
         }
-        
+
         let t = (screen_transform.translation - ray_origin).dot(plane_normal) / denom;
         if t <= 0.0 {
             continue;
         }
-        
+
         let hit_point = ray_origin + t * ray_dir;
         let local_hit = screen_transform.compute_matrix().inverse() * hit_point.extend(1.0);
         let u = (local_hit.x + 1.0) * 0.5;
         let v = (local_hit.y + 1.0) * 0.5;
-        
+
         if u >= 0.0 && u <= 1.0 && v >= 0.0 && v <= 1.0 && t < closest_distance {
             closest_distance = t;
             closest_hit = Some((virtual_screen.0, hit_point, Vec2::new(u, v)));
@@ -129,11 +129,11 @@ pub fn update_head_cursor(
         cursor_transform.translation = hit_point;
         cursor.hit_screen = Some(screen_id);
         cursor.hit_position = Some(hit_uv);
-        
+
         // Update dwell time for gaze selection
         if cursor_state.last_hit_screen == Some(screen_id) {
             cursor_state.dwell_time += time.delta_secs();
-            
+
             // Change cursor color based on dwell progress
             let progress = cursor_state.dwell_time / cursor_state.dwell_threshold;
             if progress >= 1.0 {
@@ -145,7 +145,7 @@ pub fn update_head_cursor(
             cursor_state.dwell_time = 0.0;
             cursor.color = Color::srgb(0.0, 1.0, 0.0); // Reset to green
         }
-        
+
         cursor_state.last_hit_screen = Some(screen_id);
         cursor_state.last_hit_position = Some(hit_uv);
     } else {
@@ -168,7 +168,9 @@ pub fn update_cursor_material(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     for entity in cursor_query.iter() {
-        if let (Ok(cursor), Ok(material_handle)) = (cursor_data.get(entity), material_query.get(entity)) {
+        if let (Ok(cursor), Ok(material_handle)) =
+            (cursor_data.get(entity), material_query.get(entity))
+        {
             if let Some(material) = materials.get_mut(&material_handle.0) {
                 material.base_color = cursor.color;
                 material.emissive = LinearRgba::from(cursor.color) * 0.3;
