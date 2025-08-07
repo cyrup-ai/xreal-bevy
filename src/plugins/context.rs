@@ -31,14 +31,16 @@ impl OrientationAccess {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct PerformanceBudget {
     pub frame_budget_ms: f32,
 }
 
 impl Default for PerformanceBudget {
     fn default() -> Self {
-        Self { frame_budget_ms: 16.67 }
+        Self {
+            frame_budget_ms: 16.67,
+        }
     }
 }
 
@@ -71,13 +73,19 @@ pub struct PluginPerformanceTracker {
 
 impl PluginPerformanceTracker {
     pub fn new(_thresholds: PerformanceThresholds) -> Self {
-        Self { average_frame_time: 16.67 }
+        Self {
+            average_frame_time: 16.67,
+        }
     }
 
     pub fn record_frame_time(&mut self, _time_ms: f32) {}
     pub fn record_frame_time_for_plugin(&mut self, _plugin_id: String, _time_ms: f32) {}
-    pub fn get_average_frame_time(&self) -> f32 { self.average_frame_time }
-    pub fn calculate_jitter(&self) -> f32 { 0.0 }
+    pub fn get_average_frame_time(&self) -> f32 {
+        self.average_frame_time
+    }
+    pub fn calculate_jitter(&self) -> f32 {
+        0.0
+    }
 }
 
 #[derive(Default)]
@@ -107,5 +115,7 @@ pub struct MockSurfaceTexture<'a> {
 pub struct PluginPerformanceMetrics;
 
 impl PluginPerformanceMetrics {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }

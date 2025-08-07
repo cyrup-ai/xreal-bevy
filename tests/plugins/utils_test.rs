@@ -3,7 +3,7 @@
 //! Extracted from src/plugins/examples/utils.rs to maintain clean separation
 //! between source code and test code following Rust best practices.
 
-use xreal_virtual_desktop::plugins::examples::utils::*;
+use xreal_virtual_desktop::plugins::utils::*;
 
 #[test]
 fn test_quad_vertex_size() {

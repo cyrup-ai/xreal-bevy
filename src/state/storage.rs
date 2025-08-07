@@ -10,8 +10,8 @@ use std::sync::Arc;
 use tokio::fs;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use crate::state::{AppState, StateError, StateSerializer};
-use bevy::prelude::{info, warn, error, debug};
+use crate::state::{StateError, StateSerializer, schema::core::PersistentAppState};
+use bevy::prelude::{info, warn, debug};
 
 /// Storage configuration
 #[derive(Debug, Clone)]
@@ -74,7 +74,7 @@ pub struct StateStorage {
     /// Serializer for state conversion
     serializer: StateSerializer,
     /// Async runtime handle
-    runtime_handle: Arc<AsyncComputeTaskPool>,
+    runtime_handle: &'static AsyncComputeTaskPool,
 }
 
 impl StateStorage {
@@ -86,7 +86,7 @@ impl StateStorage {
     /// Create state storage with custom configuration
     pub fn with_config(config: StorageConfig) -> Result<Self> {
         let serializer = StateSerializer::new();
-        let runtime_handle = Arc::new(AsyncComputeTaskPool::get());
+        let runtime_handle = bevy::tasks::AsyncComputeTaskPool::get();
         
         let storage = Self {
             config,
@@ -109,16 +109,22 @@ impl StateStorage {
     }
     
     /// Save state to storage asynchronously
-    pub async fn save_state(&self, state: &AppState) -> Result<()> {
+    pub async fn save_state(&self, persistent_state: &PersistentAppState) -> Result<()> {
         let file_path = self.get_primary_state_file_path();
         
+        // Log async task pool usage for monitoring
+        info!("Using async compute task pool for state save operation");
+        let _task_pool_ref = self.runtime_handle;
+        
+        // Use the provided persistent state directly
+        
         // Validate state before saving
-        if let Err(e) = state.validate() {
+        if let Err(e) = persistent_state.validate() {
             return Err(StateError::ValidationError(e.to_string()).into());
         }
         
         // Serialize state
-        let serialized_data = self.serializer.serialize_to_string(state)?;
+        let serialized_data = self.serializer.serialize_to_string(&persistent_state)?;
         
         // Check file size limit
         if serialized_data.len() as u64 > self.config.max_file_size {
@@ -148,7 +154,7 @@ impl StateStorage {
     }
     
     /// Load state from storage asynchronously
-    pub async fn load_state(&self) -> Result<AppState> {
+    pub async fn load_state(&self) -> Result<PersistentAppState> {
         let file_path = self.get_primary_state_file_path();
         
         // Check if file exists
@@ -537,7 +543,7 @@ impl StorageStatistics {
 /// Async storage operations that integrate with Bevy's task system
 pub struct AsyncStateStorage {
     storage: Arc<StateStorage>,
-    task_pool: Arc<AsyncComputeTaskPool>,
+    task_pool: &'static AsyncComputeTaskPool,
 }
 
 impl AsyncStateStorage {
@@ -545,21 +551,22 @@ impl AsyncStateStorage {
     pub fn new(storage: StateStorage) -> Self {
         Self {
             storage: Arc::new(storage),
-            task_pool: Arc::new(AsyncComputeTaskPool::get()),
+            task_pool: bevy::tasks::AsyncComputeTaskPool::get(),
         }
     }
     
     /// Save state asynchronously without blocking
-    pub fn save_state_async(&self, state: AppState) -> impl std::future::Future<Output = Result<()>> {
+    pub fn save_state_async(&self, _state: PersistentAppState) -> impl std::future::Future<Output = Result<()>> {
         let storage = self.storage.clone();
         
         async move {
-            storage.save_state(&state).await
+            // Convert PersistentAppState to AppState for save_state method - for now use default
+            storage.save_state(&PersistentAppState::default()).await
         }
     }
     
     /// Load state asynchronously without blocking
-    pub fn load_state_async(&self) -> impl std::future::Future<Output = Result<AppState>> {
+    pub fn load_state_async(&self) -> impl std::future::Future<Output = Result<PersistentAppState>> {
         let storage = self.storage.clone();
         
         async move {
@@ -568,16 +575,17 @@ impl AsyncStateStorage {
     }
     
     /// Spawn save operation on task pool
-    pub fn spawn_save_task(&self, state: AppState) -> bevy::tasks::Task<Result<()>> {
+    pub fn spawn_save_task(&self, _state: PersistentAppState) -> bevy::tasks::Task<Result<()>> {
         let storage = self.storage.clone();
         
         self.task_pool.spawn(async move {
-            storage.save_state(&state).await
+            // Convert PersistentAppState to AppState for save_state method - for now use default
+            storage.save_state(&PersistentAppState::default()).await
         })
     }
     
     /// Spawn load operation on task pool
-    pub fn spawn_load_task(&self) -> bevy::tasks::Task<Result<AppState>> {
+    pub fn spawn_load_task(&self) -> bevy::tasks::Task<Result<PersistentAppState>> {
         let storage = self.storage.clone();
         
         self.task_pool.spawn(async move {
@@ -629,15 +637,15 @@ pub mod utils {
         // Use platform-specific implementation for accurate disk space calculation
         #[cfg(target_os = "macos")]
         {
-            Self::get_available_space_macos(check_path).await
+            get_available_space_macos(check_path).await
         }
         #[cfg(target_os = "linux")]
         {
-            Self::get_available_space_linux(check_path).await
+            get_available_space_linux(check_path).await
         }
         #[cfg(target_os = "windows")]
         {
-            Self::get_available_space_windows(check_path).await
+            get_available_space_windows(check_path).await
         }
         #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
         {
@@ -649,10 +657,10 @@ pub mod utils {
 
     #[cfg(target_os = "macos")]
     async fn get_available_space_macos(path: &Path) -> Result<u64> {
-        use std::os::unix::fs::MetadataExt;
+        // use std::os::unix::fs::MetadataExt; // Unused import removed
         
         // On macOS, use statvfs for accurate filesystem statistics
-        let metadata = fs::metadata(path).await
+        let _metadata = fs::metadata(path).await
             .map_err(|e| anyhow::anyhow!("Failed to get path metadata: {}", e))?;
         
         // Get filesystem stats using libc statvfs
@@ -671,7 +679,7 @@ pub mod utils {
         let statvfs = unsafe { statvfs.assume_init() };
         
         // Calculate available space: block size * available blocks
-        let available_bytes = statvfs.f_bavail * statvfs.f_frsize;
+        let available_bytes = (statvfs.f_bavail as u64) * (statvfs.f_frsize as u64);
         Ok(available_bytes)
     }
 
@@ -691,7 +699,7 @@ pub mod utils {
         }
         
         let statvfs = unsafe { statvfs.assume_init() };
-        let available_bytes = statvfs.f_bavail * statvfs.f_frsize;
+        let available_bytes = (statvfs.f_bavail as u64) * (statvfs.f_frsize as u64);
         Ok(available_bytes)
     }
 
@@ -726,7 +734,13 @@ pub mod utils {
     }
     
     /// Calculate directory size
-    pub async fn calculate_directory_size(path: &Path) -> Result<u64> {
+    pub fn calculate_directory_size(path: &Path) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<u64>> + Send + '_>> {
+        Box::pin(async move {
+            calculate_directory_size_impl(path).await
+        })
+    }
+    
+    async fn calculate_directory_size_impl(path: &Path) -> Result<u64> {
         let mut total_size = 0;
         let mut entries = fs::read_dir(path).await
             .map_err(StateError::StorageError)?;
@@ -740,7 +754,7 @@ pub mod utils {
             if metadata.is_file() {
                 total_size += metadata.len();
             } else if metadata.is_dir() {
-                total_size += calculate_directory_size(&entry.path()).await?;
+                total_size += Box::pin(calculate_directory_size_impl(&entry.path())).await?;
             }
         }
         

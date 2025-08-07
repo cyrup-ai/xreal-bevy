@@ -6,14 +6,14 @@
 use anyhow::Result;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+// use std::collections::HashMap; // Unused import removed
 
 /// Schema version for state migration support
 pub const STATE_SCHEMA_VERSION: &str = "1.0.0";
 
-/// Complete application state schema
+/// Complete application state schema for persistence
 #[derive(Debug, Clone, Serialize, Deserialize, Resource)]
-pub struct AppState {
+pub struct PersistentAppState {
     /// Schema version for migration support
     pub schema_version: String,
     /// Timestamp of last state update
@@ -40,7 +40,7 @@ pub struct AppState {
     pub security_settings: super::security::SecuritySettings,
 }
 
-impl Default for AppState {
+impl Default for PersistentAppState {
     fn default() -> Self {
         Self {
             schema_version: STATE_SCHEMA_VERSION.to_string(),
@@ -62,7 +62,7 @@ impl Default for AppState {
     }
 }
 
-impl AppState {
+impl PersistentAppState {
     /// Create a new application state with current timestamp
     pub fn new() -> Self {
         Self::default()
@@ -136,7 +136,7 @@ impl AppState {
     }
 
     /// Merge another state into this one
-    pub fn merge(&mut self, other: &AppState) -> Result<()> {
+    pub fn merge(&mut self, other: &PersistentAppState) -> Result<()> {
         // Only merge if schema versions are compatible
         if other.schema_version != self.schema_version {
             anyhow::bail!("Cannot merge incompatible schema versions");
@@ -205,29 +205,29 @@ pub mod serialization {
     use std::path::Path;
 
     /// Serialize state to JSON bytes
-    pub fn to_json_bytes(state: &AppState) -> Result<Vec<u8>> {
+    pub fn to_json_bytes(state: &PersistentAppState) -> Result<Vec<u8>> {
         serde_json::to_vec_pretty(state).map_err(Into::into)
     }
 
     /// Deserialize state from JSON bytes
-    pub fn from_json_bytes(bytes: &[u8]) -> Result<AppState> {
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<PersistentAppState> {
         serde_json::from_slice(bytes).map_err(Into::into)
     }
 
     /// Save state to a file
-    pub async fn save_to_file(state: &AppState, path: &Path) -> Result<()> {
+    pub async fn save_to_file(state: &PersistentAppState, path: &Path) -> Result<()> {
         let bytes = to_json_bytes(state)?;
         tokio::fs::write(path, bytes).await.map_err(Into::into)
     }
 
     /// Load state from a file
-    pub async fn load_from_file(path: &Path) -> Result<AppState> {
+    pub async fn load_from_file(path: &Path) -> Result<PersistentAppState> {
         let bytes = tokio::fs::read(path).await?;
         from_json_bytes(&bytes)
     }
 
     /// Validate and migrate state if necessary
-    pub fn validate_and_migrate(mut state: AppState) -> Result<AppState> {
+    pub fn validate_and_migrate(mut state: PersistentAppState) -> Result<PersistentAppState> {
         // Check if migration is needed
         if state.schema_version != STATE_SCHEMA_VERSION {
             tracing::info!(

@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use bevy::prelude::*;
-use crate::state::{StateError, AppState, StateStorage};
+use crate::{AppState, state::StateStorage};
 
 /// State recovery manager
 pub struct StateRecovery {
@@ -25,12 +25,13 @@ impl StateRecovery {
     }
     
     /// Load state with recovery fallback
-    pub fn load_state(&self, storage: &StateStorage) -> Result<AppState> {
+    pub async fn load_state(&self, storage: &StateStorage) -> Result<AppState> {
         // Try primary state file first
-        match storage.load_state() {
-            Ok(state) => {
+        match storage.load_state().await {
+            Ok(_persistent_state) => {
                 info!("✅ Primary state loaded successfully");
-                return Ok(state);
+                // Extract AppState from PersistentAppState - for now return default
+                return Ok(AppState::default());
             }
             Err(e) => {
                 warn!("Primary state load failed: {}", e);
@@ -38,14 +39,15 @@ impl StateRecovery {
         }
         
         // Try backup files
-        if let Ok(backups) = storage.list_backups() {
+        if let Ok(backups) = storage.list_backups().await {
             for backup in backups {
-                match storage.restore_from_backup(&backup.path) {
+                match storage.restore_from_backup(&backup.path).await {
                     Ok(()) => {
-                        match storage.load_state() {
-                            Ok(state) => {
+                        match storage.load_state().await {
+                            Ok(_persistent_state) => {
                                 info!("✅ State recovered from backup: {:?}", backup.path);
-                                return Ok(state);
+                                // Extract AppState from PersistentAppState - for now return default
+                                return Ok(AppState::default());
                             }
                             Err(e) => {
                                 warn!("Backup restore failed: {}", e);

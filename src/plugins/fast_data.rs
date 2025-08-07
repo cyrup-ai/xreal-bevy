@@ -2,25 +2,25 @@
 
 #![allow(dead_code)]
 
-pub use crate::state::schema::plugins::*;
+use crate::plugins::{PluginAuthor, PluginDescription, PluginId, PluginName, PluginVersion};
 
 // Stub implementations
 pub fn create_plugin_id(id: &str) -> PluginId {
-    PluginId::new(id.to_string())
+    PluginId::from(id)
 }
 
 pub fn create_plugin_name(name: &str) -> PluginName {
-    PluginName::new(name.to_string())
+    PluginName::from(name)
 }
 
 pub fn create_plugin_version(version: &str) -> PluginVersion {
-    PluginVersion::new(version.to_string())
+    PluginVersion::from(version)
 }
 
 pub fn create_plugin_description(desc: &str) -> PluginDescription {
-    PluginDescription::new(desc.to_string())
+    PluginDescription::from(desc)
 }
 
 pub fn create_plugin_author(author: &str) -> PluginAuthor {
-    PluginAuthor::new(author.to_string())
+    PluginAuthor::from(author)
 }

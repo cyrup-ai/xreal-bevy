@@ -3,7 +3,7 @@
 //! Extracted from src/plugins/input.rs to maintain clean separation
 //! between source code and test code following Rust best practices.
 
-use xreal_virtual_desktop::plugins::input::*;
+use xreal_virtual_desktop::input::*;
 
 // Note: Actual tests will be in the tests/ directory per requirements
 // These are just compile-time checks

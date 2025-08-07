@@ -53,7 +53,7 @@ pub mod security;
 
 // Re-export commonly used types for convenience
 pub use core::{
-    AppState, StateValidation, StateMigration, STATE_SCHEMA_VERSION,
+    StateValidation, StateMigration, STATE_SCHEMA_VERSION,
 };
 
 pub use preferences::{

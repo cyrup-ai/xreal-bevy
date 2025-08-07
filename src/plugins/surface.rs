@@ -21,7 +21,12 @@ impl SurfaceManager {
         0
     }
 
-    pub fn update_surface_transform(&mut self, _id: &str, _pos: Vec3, _visible: bool) -> Result<()> {
+    pub fn update_surface_transform(
+        &mut self,
+        _id: &str,
+        _pos: Vec3,
+        _visible: bool,
+    ) -> Result<()> {
         Ok(())
     }
 

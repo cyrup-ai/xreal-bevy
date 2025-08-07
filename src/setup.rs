@@ -6,8 +6,8 @@ use std::time::SystemTime;
 use tokio::fs;
 use tokio::process::Command;
 
-const XREAL_VENDOR_ID: u16 = 0x3318;
-const XREAL_PRODUCT_ID: u16 = 0x0424;
+pub const XREAL_VENDOR_ID: u16 = 0x3318;
+pub const XREAL_PRODUCT_ID: u16 = 0x0424;
 const CACHE_DURATION_SECS: u64 = 86400; // 24 hours
 
 #[derive(Resource, Default, Debug)]
@@ -29,17 +29,22 @@ pub struct DependencyCheckState(pub Option<bool>);
 pub struct LibusbCheckTask(pub Task<bool>);
 
 #[derive(Component)]
+#[allow(dead_code)]
 pub struct LibusbInstallTask(pub Task<bool>);
 
 #[derive(Component)]
+#[allow(dead_code)]
 pub struct GlassesCheckTask(pub Task<bool>);
 
 #[derive(Component)]
+#[allow(dead_code)]
 pub struct CacheCheckTask(pub Task<bool>);
 
 #[derive(Component)]
+#[allow(dead_code)]
 pub struct CacheUpdateTask(pub Task<bool>);
 
+#[allow(dead_code)]
 pub fn spawn_startup_tasks(mut commands: Commands) {
     info!("🚀 Spawning startup tasks...");
     let thread_pool = AsyncComputeTaskPool::get();
@@ -54,13 +59,16 @@ pub fn spawn_startup_tasks(mut commands: Commands) {
     commands.spawn(CacheCheckTask(task));
 }
 
+#[allow(dead_code)]
 pub fn handle_libusb_check_task(
     mut commands: Commands,
     mut task_query: Query<(Entity, &mut LibusbCheckTask)>,
     mut state: ResMut<LibusbCheckState>,
 ) {
     for (entity, mut task) in task_query.iter_mut() {
-        if let Some(result) = bevy::tasks::block_on(bevy::tasks::futures_lite::future::poll_once(&mut task.0)) {
+        if let Some(result) =
+            bevy::tasks::block_on(bevy::tasks::futures_lite::future::poll_once(&mut task.0))
+        {
             state.0 = Some(result);
             if !result {
                 info!("🔧 libusb not found. Spawning installation task...");
@@ -72,39 +80,48 @@ pub fn handle_libusb_check_task(
     }
 }
 
+#[allow(dead_code)]
 pub fn handle_libusb_install_task(
     mut commands: Commands,
     mut task_query: Query<(Entity, &mut LibusbInstallTask)>,
     mut status: ResMut<LibusbInstallStatus>,
 ) {
     for (entity, mut task) in task_query.iter_mut() {
-        if let Some(result) = bevy::tasks::block_on(bevy::tasks::futures_lite::future::poll_once(&mut task.0)) {
+        if let Some(result) =
+            bevy::tasks::block_on(bevy::tasks::futures_lite::future::poll_once(&mut task.0))
+        {
             status.0 = Some(result);
             commands.entity(entity).despawn();
         }
     }
 }
 
+#[allow(dead_code)]
 pub fn handle_glasses_check_task(
     mut commands: Commands,
     mut task_query: Query<(Entity, &mut GlassesCheckTask)>,
     mut state: ResMut<GlassesConnectionState>,
 ) {
     for (entity, mut task) in task_query.iter_mut() {
-        if let Some(result) = bevy::tasks::block_on(bevy::tasks::futures_lite::future::poll_once(&mut task.0)) {
+        if let Some(result) =
+            bevy::tasks::block_on(bevy::tasks::futures_lite::future::poll_once(&mut task.0))
+        {
             state.0 = Some(result);
             commands.entity(entity).despawn();
         }
     }
 }
 
+#[allow(dead_code)]
 pub fn handle_cache_check_task(
     mut commands: Commands,
     mut task_query: Query<(Entity, &mut CacheCheckTask)>,
     mut state: ResMut<CacheValidityState>,
 ) {
     for (entity, mut task) in task_query.iter_mut() {
-        if let Some(result) = bevy::tasks::block_on(bevy::tasks::futures_lite::future::poll_once(&mut task.0)) {
+        if let Some(result) =
+            bevy::tasks::block_on(bevy::tasks::futures_lite::future::poll_once(&mut task.0))
+        {
             state.0 = Some(result);
             if !result {
                 info!("🗃️ Cache is stale or invalid. Spawning update task...");
@@ -116,13 +133,16 @@ pub fn handle_cache_check_task(
     }
 }
 
+#[allow(dead_code)]
 pub fn handle_cache_update_task(
     mut commands: Commands,
     mut task_query: Query<(Entity, &mut CacheUpdateTask)>,
     mut state: ResMut<CacheValidityState>,
 ) {
     for (entity, mut task) in task_query.iter_mut() {
-        if let Some(result) = bevy::tasks::block_on(bevy::tasks::futures_lite::future::poll_once(&mut task.0)) {
+        if let Some(result) =
+            bevy::tasks::block_on(bevy::tasks::futures_lite::future::poll_once(&mut task.0))
+        {
             if result {
                 state.0 = Some(true);
             }
@@ -131,6 +151,7 @@ pub fn handle_cache_update_task(
     }
 }
 
+#[allow(dead_code)]
 pub fn check_startup_completion(
     mut next_state: ResMut<NextState<crate::AppState>>,
     libusb_check: Res<LibusbCheckState>,
@@ -162,10 +183,12 @@ pub fn check_startup_completion(
     }
 }
 
+#[allow(dead_code)]
 pub fn show_failure_message() {
     error!("FATAL: Startup checks failed. Please check the logs for more details. The application cannot continue.");
 }
 
+#[allow(dead_code)]
 async fn async_check_libusb_task() -> bool {
     info!("Checking for libusb...");
     match Command::new("pkg-config")
@@ -193,6 +216,7 @@ async fn async_check_libusb_task() -> bool {
     }
 }
 
+#[allow(dead_code)]
 async fn async_install_libusb_task() -> bool {
     info!("Attempting to install libusb via Homebrew...");
     let brew_installed = match Command::new("which").arg("brew").status().await {
@@ -226,6 +250,7 @@ async fn async_install_libusb_task() -> bool {
     }
 }
 
+#[allow(dead_code)]
 async fn async_check_glasses_task() -> bool {
     info!("Checking for XREAL glasses connection...");
     match ar_drivers::any_glasses() {
@@ -240,12 +265,14 @@ async fn async_check_glasses_task() -> bool {
     }
 }
 
+#[allow(dead_code)]
 fn get_cache_file_path() -> Result<PathBuf> {
     let cache_dir = dirs::cache_dir().context("Failed to find cache directory")?;
     let app_cache_dir = cache_dir.join("xreal_bevy");
     Ok(app_cache_dir.join("dependency_check.timestamp"))
 }
 
+#[allow(dead_code)]
 async fn async_check_cache_task() -> bool {
     info!("Checking cache validity...");
     let Ok(cache_file) = get_cache_file_path() else {
@@ -273,6 +300,7 @@ async fn async_check_cache_task() -> bool {
     }
 }
 
+#[allow(dead_code)]
 async fn async_update_cache_task() -> bool {
     info!("Updating cache...");
     let Ok(cache_file) = get_cache_file_path() else {

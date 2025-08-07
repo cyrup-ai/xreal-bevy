@@ -1,13 +1,13 @@
 use crate::input::error::InputError;
 use crate::input::InputConfig;
-use bevy::prelude::*;
-use enigo::*;
-use std::sync::atomic::{AtomicU64, Ordering};
+use bevy::ecs::system::NonSend;
 use bevy::input::keyboard::KeyCode;
 use bevy::input::mouse::MouseButton;
+use bevy::prelude::*;
 use enigo::Button;
+use enigo::*;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
-use bevy::ecs::system::NonSend;
 use tracing::warn;
 
 // Use marker types instead of negative trait bounds for !Send and !Sync
@@ -311,7 +311,10 @@ impl InputSystem {
             // Catch-all for truly unsupported keys
             _ => {
                 // Log the unsupported key for debugging but provide a reasonable fallback
-                warn!("Unsupported key mapping for {:?}, using space as fallback", key);
+                warn!(
+                    "Unsupported key mapping for {:?}, using space as fallback",
+                    key
+                );
                 Ok(enigo::Key::Unicode(' ')) // Safe fallback that won't break functionality
             }
         }

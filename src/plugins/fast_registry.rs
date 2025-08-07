@@ -2,9 +2,11 @@
 
 #![allow(dead_code)]
 
+use crate::plugins::{
+    AtomicPluginState, PluginMetadata, PluginSystemConfig, SmallString,
+};
 use anyhow::Result;
 use bevy::prelude::*;
-use crate::state::schema::plugins::*;
 
 #[derive(Resource)]
 pub struct FastPluginRegistry {
@@ -51,11 +53,11 @@ pub fn fast_plugin_event_system() {
 #[derive(Debug, Clone)]
 pub enum FastPluginEvent {
     None,
-    PluginLoaded { plugin_id: SmallString },
-    PluginInitialized { plugin_id: SmallString },
-    PluginStarted { plugin_id: SmallString },
-    PluginPaused { plugin_id: SmallString },
-    PluginError { plugin_id: SmallString },
-    PluginUnloaded { plugin_id: SmallString },
-    PerformanceViolation { plugin_id: SmallString },
+    PluginLoaded { plugin_id: SmallString<64> },
+    PluginInitialized { plugin_id: SmallString<64> },
+    PluginStarted { plugin_id: SmallString<64> },
+    PluginPaused { plugin_id: SmallString<64> },
+    PluginError { plugin_id: SmallString<64> },
+    PluginUnloaded { plugin_id: SmallString<64> },
+    PerformanceViolation { plugin_id: SmallString<64> },
 }

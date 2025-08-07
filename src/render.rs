@@ -122,7 +122,9 @@ pub fn handle_capture_tasks(
 
     for mut task in &mut tasks {
         // Poll the task non-blocking using proper Bevy async pattern
-        if let Some(mut command_queue) = bevy::tasks::block_on(bevy::tasks::futures_lite::future::poll_once(&mut task.0)) {
+        if let Some(mut command_queue) =
+            bevy::tasks::block_on(bevy::tasks::futures_lite::future::poll_once(&mut task.0))
+        {
             // Measure screen capture timing for jitter analysis
             if jitter_metrics.last_capture_time > 0.0 {
                 let capture_interval = current_time - jitter_metrics.last_capture_time;
