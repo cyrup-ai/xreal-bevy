@@ -157,7 +157,8 @@ impl PersistentAppState {
         self.plugin_state.merge(&other.plugin_state)?;
 
         // Merge performance settings
-        self.performance_settings.merge(&other.performance_settings)?;
+        self.performance_settings
+            .merge(&other.performance_settings)?;
 
         // Merge window layout
         self.window_layout.merge(&other.window_layout)?;
@@ -235,7 +236,7 @@ pub mod serialization {
                 state.schema_version,
                 STATE_SCHEMA_VERSION
             );
-            
+
             // Perform migration based on version
             match state.schema_version.as_str() {
                 "0.9.0" => {

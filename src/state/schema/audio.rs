@@ -3,9 +3,9 @@
 //! This module provides audio configuration structures with validation and
 //! serialization support for the XREAL application state system.
 
+use super::core::StateValidation;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use super::core::StateValidation;
 
 /// Audio system settings
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,7 +36,7 @@ impl StateValidation for AudioSettings {
         if self.master_volume < 0.0 || self.master_volume > 1.0 {
             anyhow::bail!("Master volume out of range: {}", self.master_volume);
         }
-        
+
         self.device_config.validate()?;
         self.spatial_audio.validate()?;
         self.effects.validate()?;
@@ -84,15 +84,15 @@ impl StateValidation for AudioDeviceConfig {
         if ![44100, 48000, 96000].contains(&self.sample_rate) {
             anyhow::bail!("Unsupported sample rate: {}", self.sample_rate);
         }
-        
+
         if ![16, 24, 32].contains(&self.bit_depth) {
             anyhow::bail!("Unsupported bit depth: {}", self.bit_depth);
         }
-        
+
         if !self.buffer_size.is_power_of_two() || self.buffer_size < 64 || self.buffer_size > 8192 {
             anyhow::bail!("Invalid buffer size: {}", self.buffer_size);
         }
-        
+
         Ok(())
     }
 
@@ -133,7 +133,10 @@ impl Default for SpatialAudioSettings {
 impl StateValidation for SpatialAudioSettings {
     fn validate(&self) -> Result<()> {
         if self.distance_attenuation < 0.0 || self.distance_attenuation > 2.0 {
-            anyhow::bail!("Distance attenuation out of range: {}", self.distance_attenuation);
+            anyhow::bail!(
+                "Distance attenuation out of range: {}",
+                self.distance_attenuation
+            );
         }
         Ok(())
     }
@@ -176,11 +179,11 @@ impl StateValidation for AudioEffectsSettings {
         if self.reverb_amount < 0.0 || self.reverb_amount > 1.0 {
             anyhow::bail!("Reverb amount out of range: {}", self.reverb_amount);
         }
-        
+
         if self.echo_delay_ms < 10 || self.echo_delay_ms > 2000 {
             anyhow::bail!("Echo delay out of range: {}", self.echo_delay_ms);
         }
-        
+
         Ok(())
     }
 

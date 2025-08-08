@@ -3,9 +3,9 @@
 //! This module provides security configuration structures with validation and
 //! serialization support for the XREAL application state system.
 
+use super::core::StateValidation;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use super::core::StateValidation;
 
 /// Security configuration settings
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -78,7 +78,10 @@ impl Default for AuthenticationSettings {
 impl StateValidation for AuthenticationSettings {
     fn validate(&self) -> Result<()> {
         if self.session_timeout_mins < 5 || self.session_timeout_mins > 1440 {
-            anyhow::bail!("Session timeout out of range: {}", self.session_timeout_mins);
+            anyhow::bail!(
+                "Session timeout out of range: {}",
+                self.session_timeout_mins
+            );
         }
         Ok(())
     }

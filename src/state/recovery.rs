@@ -1,11 +1,11 @@
 //! State Recovery System
-//! 
+//!
 //! Provides multi-layer recovery with primary/backup/default fallback chain.
 //! Handles corrupted state files and provides graceful degradation.
 
+use crate::{state::StateStorage, AppState};
 use anyhow::Result;
 use bevy::prelude::*;
-use crate::{AppState, state::StateStorage};
 
 /// State recovery manager
 pub struct StateRecovery {
@@ -23,7 +23,7 @@ impl StateRecovery {
             max_attempts: 3,
         }
     }
-    
+
     /// Load state with recovery fallback
     pub async fn load_state(&self, storage: &StateStorage) -> Result<AppState> {
         // Try primary state file first
@@ -37,7 +37,7 @@ impl StateRecovery {
                 warn!("Primary state load failed: {}", e);
             }
         }
-        
+
         // Try backup files
         if let Ok(backups) = storage.list_backups().await {
             for backup in backups {
@@ -60,7 +60,7 @@ impl StateRecovery {
                 }
             }
         }
-        
+
         // Fall back to default state
         warn!("🔄 Using default state as fallback");
         Ok(AppState::default())

@@ -3,10 +3,10 @@
 //! This module provides input system structures with validation and
 //! serialization support for the XREAL application state system.
 
+use super::core::StateValidation;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use super::core::StateValidation;
 
 /// Input system configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,12 +48,12 @@ impl StateValidation for InputConfig {
         self.gaze_input.merge(&other.gaze_input)?;
         self.gesture_input.merge(&other.gesture_input)?;
         self.voice_input.merge(&other.voice_input)?;
-        
+
         // Merge keyboard shortcuts
         for (key, value) in &other.keyboard_shortcuts {
             self.keyboard_shortcuts.insert(key.clone(), value.clone());
         }
-        
+
         self.sensitivity.merge(&other.sensitivity)?;
         Ok(())
     }
@@ -133,11 +133,11 @@ impl StateValidation for GestureInputSettings {
         if self.sensitivity < 0.0 || self.sensitivity > 1.0 {
             anyhow::bail!("Gesture sensitivity out of range: {}", self.sensitivity);
         }
-        
+
         if self.min_duration_ms >= self.max_duration_ms {
             anyhow::bail!("Invalid gesture duration range");
         }
-        
+
         Ok(())
     }
 
@@ -182,11 +182,11 @@ impl StateValidation for VoiceInputSettings {
         if self.sensitivity < 0.0 || self.sensitivity > 1.0 {
             anyhow::bail!("Voice sensitivity out of range: {}", self.sensitivity);
         }
-        
+
         if self.wake_word.is_empty() && self.wake_word_required {
             anyhow::bail!("Wake word required but empty");
         }
-        
+
         Ok(())
     }
 
@@ -232,13 +232,13 @@ impl StateValidation for SensitivitySettings {
             ("touch", self.touch_sensitivity),
             ("head_tracking", self.head_tracking_sensitivity),
         ];
-        
+
         for (name, value) in sensitivities {
             if value < 0.1 || value > 5.0 {
                 anyhow::bail!("{} sensitivity out of range: {}", name, value);
             }
         }
-        
+
         Ok(())
     }
 

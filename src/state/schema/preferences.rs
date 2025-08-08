@@ -3,9 +3,9 @@
 //! This module provides user preference structures with validation and
 //! serialization support for the XREAL application state system.
 
+use super::core::StateValidation;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use super::core::StateValidation;
 
 /// User preference settings
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,7 +77,8 @@ impl StateValidation for UserPreferences {
 
         // Merge complex fields
         self.comfort_settings.merge(&other.comfort_settings)?;
-        self.accessibility_settings.merge(&other.accessibility_settings)?;
+        self.accessibility_settings
+            .merge(&other.accessibility_settings)?;
         self.privacy_settings.merge(&other.privacy_settings)?;
         self.appearance_settings.merge(&other.appearance_settings)?;
 
@@ -291,7 +292,10 @@ impl StateValidation for PrivacySettings {
     fn validate(&self) -> Result<()> {
         // Validate data retention period
         if self.data_retention_days < 1 || self.data_retention_days > 3650 {
-            anyhow::bail!("Data retention period out of range: {}", self.data_retention_days);
+            anyhow::bail!(
+                "Data retention period out of range: {}",
+                self.data_retention_days
+            );
         }
 
         Ok(())
@@ -360,7 +364,10 @@ impl StateValidation for AppearanceSettings {
 
         // Validate font size multiplier
         if self.font_size_multiplier < 0.5 || self.font_size_multiplier > 3.0 {
-            anyhow::bail!("Font size multiplier out of range: {}", self.font_size_multiplier);
+            anyhow::bail!(
+                "Font size multiplier out of range: {}",
+                self.font_size_multiplier
+            );
         }
 
         Ok(())

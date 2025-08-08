@@ -65,17 +65,33 @@ pub fn handle_libusb_check_task(
     mut task_query: Query<(Entity, &mut LibusbCheckTask)>,
     mut state: ResMut<LibusbCheckState>,
 ) {
+    use futures_lite::future::FutureExt;
+    use std::task::{Context, Poll, Waker};
+
     for (entity, mut task) in task_query.iter_mut() {
-        if let Some(result) =
-            bevy::tasks::block_on(bevy::tasks::futures_lite::future::poll_once(&mut task.0))
-        {
-            state.0 = Some(result);
-            if !result {
-                info!("🔧 libusb not found. Spawning installation task...");
-                let install_task = AsyncComputeTaskPool::get().spawn(async_install_libusb_task());
-                commands.spawn(LibusbInstallTask(install_task));
+        if task.0.is_finished() {
+            // Create a no-op waker for non-blocking poll
+            let waker = Waker::noop();
+            let mut context = Context::from_waker(&waker);
+
+            // Poll the task directly without blocking
+            match task.0.poll(&mut context) {
+                Poll::Ready(result) => {
+                    state.0 = Some(result);
+                    if !result {
+                        info!("🔧 libusb not found. Spawning installation task...");
+                        let install_task =
+                            AsyncComputeTaskPool::get().spawn(async_install_libusb_task());
+                        commands.spawn(LibusbInstallTask(install_task));
+                    }
+                    commands.entity(entity).despawn();
+                }
+                Poll::Pending => {
+                    // This shouldn't happen for a finished task, but handle gracefully
+                    error!("Task reported as finished but poll returned Pending");
+                    commands.entity(entity).despawn();
+                }
             }
-            commands.entity(entity).despawn();
         }
     }
 }
@@ -86,12 +102,24 @@ pub fn handle_libusb_install_task(
     mut task_query: Query<(Entity, &mut LibusbInstallTask)>,
     mut status: ResMut<LibusbInstallStatus>,
 ) {
+    use futures_lite::future::FutureExt;
+    use std::task::{Context, Poll, Waker};
+
     for (entity, mut task) in task_query.iter_mut() {
-        if let Some(result) =
-            bevy::tasks::block_on(bevy::tasks::futures_lite::future::poll_once(&mut task.0))
-        {
-            status.0 = Some(result);
-            commands.entity(entity).despawn();
+        if task.0.is_finished() {
+            let waker = Waker::noop();
+            let mut context = Context::from_waker(&waker);
+
+            match task.0.poll(&mut context) {
+                Poll::Ready(result) => {
+                    status.0 = Some(result);
+                    commands.entity(entity).despawn();
+                }
+                Poll::Pending => {
+                    error!("Task reported as finished but poll returned Pending");
+                    commands.entity(entity).despawn();
+                }
+            }
         }
     }
 }
@@ -102,12 +130,24 @@ pub fn handle_glasses_check_task(
     mut task_query: Query<(Entity, &mut GlassesCheckTask)>,
     mut state: ResMut<GlassesConnectionState>,
 ) {
+    use futures_lite::future::FutureExt;
+    use std::task::{Context, Poll, Waker};
+
     for (entity, mut task) in task_query.iter_mut() {
-        if let Some(result) =
-            bevy::tasks::block_on(bevy::tasks::futures_lite::future::poll_once(&mut task.0))
-        {
-            state.0 = Some(result);
-            commands.entity(entity).despawn();
+        if task.0.is_finished() {
+            let waker = Waker::noop();
+            let mut context = Context::from_waker(&waker);
+
+            match task.0.poll(&mut context) {
+                Poll::Ready(result) => {
+                    state.0 = Some(result);
+                    commands.entity(entity).despawn();
+                }
+                Poll::Pending => {
+                    error!("Task reported as finished but poll returned Pending");
+                    commands.entity(entity).despawn();
+                }
+            }
         }
     }
 }
@@ -118,17 +158,30 @@ pub fn handle_cache_check_task(
     mut task_query: Query<(Entity, &mut CacheCheckTask)>,
     mut state: ResMut<CacheValidityState>,
 ) {
+    use futures_lite::future::FutureExt;
+    use std::task::{Context, Poll, Waker};
+
     for (entity, mut task) in task_query.iter_mut() {
-        if let Some(result) =
-            bevy::tasks::block_on(bevy::tasks::futures_lite::future::poll_once(&mut task.0))
-        {
-            state.0 = Some(result);
-            if !result {
-                info!("🗃️ Cache is stale or invalid. Spawning update task...");
-                let update_task = AsyncComputeTaskPool::get().spawn(async_update_cache_task());
-                commands.spawn(CacheUpdateTask(update_task));
+        if task.0.is_finished() {
+            let waker = Waker::noop();
+            let mut context = Context::from_waker(&waker);
+
+            match task.0.poll(&mut context) {
+                Poll::Ready(result) => {
+                    state.0 = Some(result);
+                    if !result {
+                        info!("🗃️ Cache is stale or invalid. Spawning update task...");
+                        let update_task =
+                            AsyncComputeTaskPool::get().spawn(async_update_cache_task());
+                        commands.spawn(CacheUpdateTask(update_task));
+                    }
+                    commands.entity(entity).despawn();
+                }
+                Poll::Pending => {
+                    error!("Task reported as finished but poll returned Pending");
+                    commands.entity(entity).despawn();
+                }
             }
-            commands.entity(entity).despawn();
         }
     }
 }
@@ -139,14 +192,26 @@ pub fn handle_cache_update_task(
     mut task_query: Query<(Entity, &mut CacheUpdateTask)>,
     mut state: ResMut<CacheValidityState>,
 ) {
+    use futures_lite::future::FutureExt;
+    use std::task::{Context, Poll, Waker};
+
     for (entity, mut task) in task_query.iter_mut() {
-        if let Some(result) =
-            bevy::tasks::block_on(bevy::tasks::futures_lite::future::poll_once(&mut task.0))
-        {
-            if result {
-                state.0 = Some(true);
+        if task.0.is_finished() {
+            let waker = Waker::noop();
+            let mut context = Context::from_waker(&waker);
+
+            match task.0.poll(&mut context) {
+                Poll::Ready(result) => {
+                    if result {
+                        state.0 = Some(true);
+                    }
+                    commands.entity(entity).despawn();
+                }
+                Poll::Pending => {
+                    error!("Task reported as finished but poll returned Pending");
+                    commands.entity(entity).despawn();
+                }
             }
-            commands.entity(entity).despawn();
         }
     }
 }

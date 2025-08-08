@@ -1,10 +1,6 @@
 //! Utility types and functions for the XREAL plugin system
 
-use std::{
-    fmt,
-    ops::Deref,
-    str::FromStr,
-};
+use std::{fmt, ops::Deref, str::FromStr};
 
 /// A small string optimized for short strings with a fixed-size stack allocation
 /// and a fallback to heap allocation for longer strings.

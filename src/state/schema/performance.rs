@@ -3,9 +3,9 @@
 //! This module provides performance configuration structures with validation and
 //! serialization support for the XREAL application state system.
 
+use super::core::StateValidation;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use super::core::StateValidation;
 
 /// Performance settings and thresholds
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -112,7 +112,9 @@ impl Default for AntiAliasingSettings {
 impl StateValidation for AntiAliasingSettings {
     fn validate(&self) -> Result<()> {
         // Validate sample count
-        if self.sample_count > 16 || (self.sample_count != 0 && !self.sample_count.is_power_of_two()) {
+        if self.sample_count > 16
+            || (self.sample_count != 0 && !self.sample_count.is_power_of_two())
+        {
             anyhow::bail!("Invalid AA sample count: {}", self.sample_count);
         }
         Ok(())
@@ -171,7 +173,10 @@ impl Default for ShadowSettings {
 impl StateValidation for ShadowSettings {
     fn validate(&self) -> Result<()> {
         // Validate map resolution
-        if self.map_resolution < 256 || self.map_resolution > 8192 || !self.map_resolution.is_power_of_two() {
+        if self.map_resolution < 256
+            || self.map_resolution > 8192
+            || !self.map_resolution.is_power_of_two()
+        {
             anyhow::bail!("Invalid shadow map resolution: {}", self.map_resolution);
         }
 
@@ -240,8 +245,13 @@ impl Default for TextureSettings {
 impl StateValidation for TextureSettings {
     fn validate(&self) -> Result<()> {
         // Validate anisotropic filtering
-        if self.anisotropic_filtering > 16 || (self.anisotropic_filtering != 0 && !self.anisotropic_filtering.is_power_of_two()) {
-            anyhow::bail!("Invalid anisotropic filtering: {}", self.anisotropic_filtering);
+        if self.anisotropic_filtering > 16
+            || (self.anisotropic_filtering != 0 && !self.anisotropic_filtering.is_power_of_two())
+        {
+            anyhow::bail!(
+                "Invalid anisotropic filtering: {}",
+                self.anisotropic_filtering
+            );
         }
 
         // Validate cache size
@@ -317,17 +327,26 @@ impl StateValidation for PerformanceThresholds {
 
         // Validate memory threshold
         if self.memory_warning_mb < 128 || self.memory_warning_mb > 16384 {
-            anyhow::bail!("Memory warning threshold out of range: {}", self.memory_warning_mb);
+            anyhow::bail!(
+                "Memory warning threshold out of range: {}",
+                self.memory_warning_mb
+            );
         }
 
         // Validate CPU threshold
         if self.cpu_warning_percent < 10.0 || self.cpu_warning_percent > 100.0 {
-            anyhow::bail!("CPU warning threshold out of range: {}", self.cpu_warning_percent);
+            anyhow::bail!(
+                "CPU warning threshold out of range: {}",
+                self.cpu_warning_percent
+            );
         }
 
         // Validate GPU threshold
         if self.gpu_warning_percent < 10.0 || self.gpu_warning_percent > 100.0 {
-            anyhow::bail!("GPU warning threshold out of range: {}", self.gpu_warning_percent);
+            anyhow::bail!(
+                "GPU warning threshold out of range: {}",
+                self.gpu_warning_percent
+            );
         }
 
         Ok(())

@@ -39,68 +39,54 @@
 //! let migrated_state = state::schema::core::serialization::validate_and_migrate(loaded_state)?;
 //! ```
 
-pub mod core;
-pub mod preferences;
-pub mod ui;
-pub mod calibration;
-pub mod plugins;
-pub mod performance;
-pub mod window;
-pub mod input;
 pub mod audio;
+pub mod calibration;
+pub mod core;
+pub mod input;
 pub mod network;
+pub mod performance;
+pub mod plugins;
+pub mod preferences;
 pub mod security;
+pub mod ui;
+pub mod window;
 
 // Re-export commonly used types for convenience
-pub use core::{
-    StateValidation, StateMigration, STATE_SCHEMA_VERSION,
-};
+pub use core::{StateMigration, StateValidation, STATE_SCHEMA_VERSION};
 
 pub use preferences::{
-    UserPreferences, ComfortSettings, AccessibilitySettings, ColorBlindType,
-    PrivacySettings, AppearanceSettings,
+    AccessibilitySettings, AppearanceSettings, ColorBlindType, ComfortSettings, PrivacySettings,
+    UserPreferences,
 };
 
 pub use ui::{
-    UiState, WindowPositions, WindowRect, PanelConfigs, PanelConfig,
-    ToolbarState, ToolbarPosition, ToolbarSize, ToolbarButtons,
-    NotificationSettings, NotificationPosition,
+    NotificationPosition, NotificationSettings, PanelConfig, PanelConfigs, ToolbarButtons,
+    ToolbarPosition, ToolbarSize, ToolbarState, UiState, WindowPositions, WindowRect,
 };
 
-pub use calibration::{
-    CalibrationData, CalibrationState,
-};
+pub use calibration::{CalibrationData, CalibrationState};
 
-pub use plugins::{
-    PluginSystemState, PluginConfig, ResourceLimits, PluginPermissions,
-};
+pub use plugins::{PluginConfig, PluginPermissions, PluginSystemState, ResourceLimits};
 
 pub use performance::{
-    PerformanceSettings, RenderQuality, AntiAliasingSettings, AntiAliasingType,
-    ShadowSettings, ShadowQuality, TextureSettings, TextureQuality,
-    PerformanceThresholds,
+    AntiAliasingSettings, AntiAliasingType, PerformanceSettings, PerformanceThresholds,
+    RenderQuality, ShadowQuality, ShadowSettings, TextureQuality, TextureSettings,
 };
 
 pub use window::{
-    WindowLayout, DisplayConfig, VirtualScreenConfig, MultiMonitorConfig,
-    MonitorArrangement, WindowManagementSettings,
+    DisplayConfig, MonitorArrangement, MultiMonitorConfig, VirtualScreenConfig, WindowLayout,
+    WindowManagementSettings,
 };
 
 pub use input::{
-    InputConfig, GazeInputSettings, GestureInputSettings, VoiceInputSettings,
-    SensitivitySettings,
+    GazeInputSettings, GestureInputSettings, InputConfig, SensitivitySettings, VoiceInputSettings,
 };
 
-pub use audio::{
-    AudioSettings, AudioDeviceConfig, SpatialAudioSettings, AudioEffectsSettings,
-};
+pub use audio::{AudioDeviceConfig, AudioEffectsSettings, AudioSettings, SpatialAudioSettings};
 
-pub use network::{
-    NetworkConfig, ProxySettings, ProxyType, SslSettings, TlsVersion,
-};
+pub use network::{NetworkConfig, ProxySettings, ProxyType, SslSettings, TlsVersion};
 
 pub use security::{
-    SecuritySettings, AuthenticationSettings, AuthenticationMethod,
-    AccessControlSettings, SecurityLevel,
+    AccessControlSettings, AuthenticationMethod, AuthenticationSettings, SecurityLevel,
+    SecuritySettings,
 };
-

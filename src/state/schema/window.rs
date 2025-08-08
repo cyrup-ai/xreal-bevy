@@ -3,9 +3,9 @@
 //! This module provides window and display structures with validation and
 //! serialization support for the XREAL application state system.
 
+use super::core::StateValidation;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use super::core::StateValidation;
 
 /// Window layout and positioning configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -86,10 +86,18 @@ impl StateValidation for DisplayConfig {
     fn validate(&self) -> Result<()> {
         // Validate resolution
         if self.resolution[0] < 640 || self.resolution[1] < 480 {
-            anyhow::bail!("Resolution too low: {}x{}", self.resolution[0], self.resolution[1]);
+            anyhow::bail!(
+                "Resolution too low: {}x{}",
+                self.resolution[0],
+                self.resolution[1]
+            );
         }
         if self.resolution[0] > 7680 || self.resolution[1] > 4320 {
-            anyhow::bail!("Resolution too high: {}x{}", self.resolution[0], self.resolution[1]);
+            anyhow::bail!(
+                "Resolution too high: {}x{}",
+                self.resolution[0],
+                self.resolution[1]
+            );
         }
 
         // Validate refresh rate
@@ -314,7 +322,10 @@ impl StateValidation for WindowManagementSettings {
 
         // Validate animation duration
         if self.animation_duration_ms < 50 || self.animation_duration_ms > 2000 {
-            anyhow::bail!("Animation duration out of range: {}", self.animation_duration_ms);
+            anyhow::bail!(
+                "Animation duration out of range: {}",
+                self.animation_duration_ms
+            );
         }
 
         Ok(())

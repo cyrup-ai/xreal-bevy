@@ -3,9 +3,9 @@
 //! This module provides UI state structures with validation and
 //! serialization support for the XREAL application state system.
 
+use super::core::StateValidation;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use super::core::StateValidation;
 
 /// UI state and layout configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -70,7 +70,8 @@ impl StateValidation for UiState {
         self.window_positions.merge(&other.window_positions)?;
         self.panel_configs.merge(&other.panel_configs)?;
         self.toolbar_state.merge(&other.toolbar_state)?;
-        self.notification_settings.merge(&other.notification_settings)?;
+        self.notification_settings
+            .merge(&other.notification_settings)?;
 
         Ok(())
     }
@@ -128,7 +129,8 @@ impl StateValidation for WindowPositions {
         self.main_window.merge(&other.main_window)?;
         self.settings_window.merge(&other.settings_window)?;
         self.debug_window.merge(&other.debug_window)?;
-        self.plugin_manager_window.merge(&other.plugin_manager_window)?;
+        self.plugin_manager_window
+            .merge(&other.plugin_manager_window)?;
         Ok(())
     }
 }
@@ -166,7 +168,11 @@ impl StateValidation for WindowRect {
 
         // Validate reasonable size limits
         if self.width > 10000.0 || self.height > 10000.0 {
-            anyhow::bail!("Window dimensions too large: {}x{}", self.width, self.height);
+            anyhow::bail!(
+                "Window dimensions too large: {}x{}",
+                self.width,
+                self.height
+            );
         }
 
         Ok(())

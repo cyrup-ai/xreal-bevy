@@ -3,10 +3,10 @@
 //! This module provides plugin state structures with validation and
 //! serialization support for the XREAL application state system.
 
+use super::core::StateValidation;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use super::core::StateValidation;
 
 /// Plugin system state
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -125,7 +125,7 @@ impl StateValidation for PluginConfig {
     fn merge(&mut self, other: &Self) -> Result<()> {
         self.enabled = other.enabled;
         self.priority = other.priority;
-        
+
         // Merge settings
         for (key, value) in &other.settings {
             self.settings.insert(key.clone(), value.clone());
@@ -179,11 +179,17 @@ impl StateValidation for ResourceLimits {
         }
 
         if self.max_network_connections > 1000 {
-            anyhow::bail!("Max network connections too high: {}", self.max_network_connections);
+            anyhow::bail!(
+                "Max network connections too high: {}",
+                self.max_network_connections
+            );
         }
 
         if self.execution_timeout_secs < 1 || self.execution_timeout_secs > 3600 {
-            anyhow::bail!("Execution timeout out of range: {}", self.execution_timeout_secs);
+            anyhow::bail!(
+                "Execution timeout out of range: {}",
+                self.execution_timeout_secs
+            );
         }
 
         Ok(())

@@ -1,11 +1,11 @@
 //! State Validation System
-//! 
+//!
 //! Provides comprehensive validation for all state components with
 //! detailed error reporting and no unwrap/expect usage.
 
+use crate::AppState;
 use anyhow::Result;
 use bevy::prelude::{info, warn};
-use crate::AppState;
 
 /// State validator
 pub struct StateValidator {
@@ -23,13 +23,13 @@ impl StateValidator {
             strict_mode: true,
         }
     }
-    
+
     /// Validate complete application state
     pub fn validate(&self, state: &AppState) -> Result<()> {
         if !self.rules_enabled {
             return Ok(());
         }
-        
+
         // Validate AppState enum values and transitions
         match state {
             AppState::Startup => {
@@ -45,7 +45,7 @@ impl StateValidator {
                 info!("Validating Running state: ✅ Valid - normal operation");
             }
         }
-        
+
         Ok(())
     }
 }

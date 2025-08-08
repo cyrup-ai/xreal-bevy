@@ -2,13 +2,13 @@ pub mod state;
 
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts};
-use tracing::info;
+use tracing::{error, info};
 
 use self::state::{AppTab, DisplayPreset, SettingsPanelState, SystemStatus, TopMenuState};
 use crate::{
     tracking::{CalibrationState, Command},
-    CommandChannel, DisplayModeState, RollLockState, ScreenCaptures,
-    ScreenDistance, BrightnessState,
+    BrightnessState, CommandChannel, DisplayModeState, RollLockState, ScreenCaptures,
+    ScreenDistance,
 };
 
 #[derive(Resource, Default)]
@@ -85,7 +85,7 @@ pub fn settings_ui(
     }
     guard.rendered_this_frame = true;
     guard.frame_count += 1;
-    
+
     // Exercise JitterMetrics for performance tracking (zero allocation)
     if guard.frame_count % 60 == 0 {
         // Every 60 frames, create and exercise jitter metrics
@@ -146,7 +146,16 @@ pub fn settings_ui(
                                     .checkbox(&mut settings_panel.sbs_enabled, "Enable SBS 3D")
                                     .changed()
                                 {
-                                    display_mode.pending_change = Some(if settings_panel.sbs_enabled { 1u8 } else { 0u8 });
+                                    // Set 3D mode state with proper type alignment
+                                    display_mode.pending_change = Some(settings_panel.sbs_enabled);
+                                    info!(
+                                        "SBS 3D mode requested: {}",
+                                        if settings_panel.sbs_enabled {
+                                            "enabled"
+                                        } else {
+                                            "disabled"
+                                        }
+                                    );
                                 }
                             });
 
@@ -167,14 +176,24 @@ pub fn settings_ui(
 
                                 // Exercise the other Command variants
                                 if ui.button("🔓 Toggle Roll Lock").clicked() {
-                                    let new_state = !roll_lock.enabled;
-                                    if let Err(e) = command_sender.0.try_send(Command::SetRollLock(new_state)) {
+                                    // Toggle roll lock state properly
+                                    let new_state = !roll_lock.is_enabled;
+                                    roll_lock.pending_change = Some(new_state);
+                                    info!(
+                                        "Roll lock toggle requested: {}",
+                                        if new_state { "enabled" } else { "disabled" }
+                                    );
+                                    if let Err(e) =
+                                        command_sender.0.try_send(Command::SetRollLock(new_state))
+                                    {
                                         error!("Failed to send roll lock command: {}", e);
                                     }
                                 }
 
                                 if ui.button("📐 Start Calibration").clicked() {
-                                    if let Err(e) = command_sender.0.try_send(Command::StartCalibration) {
+                                    if let Err(e) =
+                                        command_sender.0.try_send(Command::StartCalibration)
+                                    {
                                         error!("Failed to send calibration command: {}", e);
                                     }
                                 }
@@ -182,16 +201,25 @@ pub fn settings_ui(
                                 ui.horizontal(|ui| {
                                     ui.colored_label(CyrupTheme::WARNING, "💡 Brightness:");
                                     let mut brightness_val = (*brightness).current_level;
-                                    if ui.add(egui::Slider::new(&mut brightness_val, 0..=255)).changed() {
+                                    if ui
+                                        .add(egui::Slider::new(&mut brightness_val, 0..=255))
+                                        .changed()
+                                    {
                                         brightness.pending_change = Some(brightness_val);
-                                        if let Err(e) = command_sender.0.try_send(Command::SetBrightness(brightness_val)) {
+                                        if let Err(e) = command_sender
+                                            .0
+                                            .try_send(Command::SetBrightness(brightness_val))
+                                        {
                                             error!("Failed to send brightness command: {}", e);
                                         }
                                     }
                                 });
 
                                 // Exercise CyrupTheme constants
-                                ui.colored_label(CyrupTheme::SUCCESS, "✅ System Status: Operational");
+                                ui.colored_label(
+                                    CyrupTheme::SUCCESS,
+                                    "✅ System Status: Operational",
+                                );
                             });
 
                             // Brightness Control

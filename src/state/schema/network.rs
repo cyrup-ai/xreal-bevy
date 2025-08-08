@@ -3,9 +3,9 @@
 //! This module provides network settings structures with validation and
 //! serialization support for the XREAL application state system.
 
+use super::core::StateValidation;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use super::core::StateValidation;
 
 /// Network configuration settings
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,17 +40,23 @@ impl Default for NetworkConfig {
 impl StateValidation for NetworkConfig {
     fn validate(&self) -> Result<()> {
         if self.connection_timeout_secs < 1 || self.connection_timeout_secs > 300 {
-            anyhow::bail!("Connection timeout out of range: {}", self.connection_timeout_secs);
+            anyhow::bail!(
+                "Connection timeout out of range: {}",
+                self.connection_timeout_secs
+            );
         }
-        
+
         if self.request_timeout_secs < 1 || self.request_timeout_secs > 600 {
-            anyhow::bail!("Request timeout out of range: {}", self.request_timeout_secs);
+            anyhow::bail!(
+                "Request timeout out of range: {}",
+                self.request_timeout_secs
+            );
         }
-        
+
         if self.max_connections < 1 || self.max_connections > 100 {
             anyhow::bail!("Max connections out of range: {}", self.max_connections);
         }
-        
+
         self.proxy_settings.validate()?;
         self.ssl_settings.validate()?;
         Ok(())
@@ -105,15 +111,15 @@ impl StateValidation for ProxySettings {
         if self.enabled && self.host.is_empty() {
             anyhow::bail!("Proxy host required when proxy is enabled");
         }
-        
+
         if self.port == 0 {
             anyhow::bail!("Invalid proxy port: {}", self.port);
         }
-        
+
         if self.auth_required && self.username.is_empty() {
             anyhow::bail!("Username required when proxy auth is enabled");
         }
-        
+
         Ok(())
     }
 

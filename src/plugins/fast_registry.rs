@@ -2,9 +2,7 @@
 
 #![allow(dead_code)]
 
-use crate::plugins::{
-    AtomicPluginState, PluginMetadata, PluginSystemConfig, SmallString,
-};
+use crate::plugins::{AtomicPluginState, PluginMetadata, PluginSystemConfig, SmallString};
 use anyhow::Result;
 use bevy::prelude::*;
 

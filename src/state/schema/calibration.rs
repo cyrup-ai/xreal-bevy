@@ -3,9 +3,9 @@
 //! This module provides calibration structures with validation and
 //! serialization support for the XREAL application state system.
 
+use super::core::StateValidation;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use super::core::StateValidation;
 
 /// IMU calibration data
 #[derive(Debug, Clone, Serialize, Deserialize)]

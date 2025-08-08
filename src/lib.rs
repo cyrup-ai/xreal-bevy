@@ -21,12 +21,14 @@ pub mod usb_debug;
 pub mod xreal_stereo;
 
 // Re-export commonly used types
+pub use capture::ScreenCaptures;
 pub use tracking::{CalibrationState, Command, Data, Orientation};
 pub use ui::state::*;
-pub use capture::ScreenCaptures;
 
 // Re-export AppState for setup.rs - define here to avoid import conflicts
-#[derive(States, Debug, Clone, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize)]
+#[derive(
+    States, Debug, Clone, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize,
+)]
 pub enum AppState {
     #[default]
     Startup,
@@ -46,13 +48,13 @@ pub struct ScreenDistance(pub f32);
 
 #[derive(Resource, Default)]
 pub struct DisplayModeState {
-    pub current_mode: u8,
-    pub pending_change: Option<u8>,
+    pub is_3d_enabled: bool,
+    pub pending_change: Option<bool>,
 }
 
 #[derive(Resource, Default)]
 pub struct RollLockState {
-    pub enabled: bool,
+    pub is_enabled: bool,
     pub pending_change: Option<bool>,
 }
 
